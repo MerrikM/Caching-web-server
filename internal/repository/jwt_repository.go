@@ -19,7 +19,7 @@ func NewJWTRepository(database *config.Database) *JWTRepository {
 
 // SaveRefreshToken сохраняет refresh-токен в базе данных
 // Возвращает ошибку, если операция не удалась
-func (r *JWTRepository) SaveRefreshToken(ctx context.Context, refreshToken *model.RefreshToken) error {
+func (r *JWTRepository) SaveRefreshToken(ctx context.Context, refreshToken *model.RefreshToken, ipAddress string) error {
 	query := `INSERT INTO refresh_tokens (uuid, user_uuid, token_hash, expire_at, used, user_agent, ip_address) 
 				VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
@@ -31,11 +31,11 @@ func (r *JWTRepository) SaveRefreshToken(ctx context.Context, refreshToken *mode
 		refreshToken.ExpireAt,
 		refreshToken.Used,
 		refreshToken.UserAgent,
-		refreshToken.IpAddress,
+		ipAddress,
 	)
 
 	if err != nil {
-		return util.LogError("ошибка вставки данных в БД", err)
+		return util.LogError("[JWTRepo] ошибка вставки данных в БД", err)
 	}
 
 	return nil
@@ -48,15 +48,15 @@ func (r *JWTRepository) MarkRefreshTokenUsedByUUID(ctx context.Context, refreshT
 
 	result, err := r.DB.ExecContext(ctx, query, refreshTokenUUID)
 	if err != nil {
-		return util.LogError("не удалось обновить рефреш токен", err)
+		return util.LogError("[JWTRepo] не удалось обновить рефреш токен", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return util.LogError("не удалось проверить, обновлен ли токен", err)
+		return util.LogError("[JWTRepo] не удалось проверить, обновлен ли токен", err)
 	}
 	if rowsAffected == 0 {
-		return util.LogError("не удалось найти токен для его обновления", err)
+		return util.LogError("[JWTRepo] не удалось найти токен для его обновления", err)
 	}
 
 	return nil
@@ -83,7 +83,7 @@ func (r *JWTRepository) FindByUUID(ctx context.Context, refreshTokenUUID string)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, util.LogError("токен не был найден", err)
 		}
-		return nil, util.LogError("ошибка при выполнении запроса", err)
+		return nil, util.LogError("[JWTRepo] ошибка при выполнении запроса", err)
 	}
 
 	return refreshToken, nil
