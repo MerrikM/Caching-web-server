@@ -6,8 +6,10 @@ import (
 	"caching-web-server/internal/util"
 	"context"
 	_ "database/sql"
-	"fmt"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
+	"strconv"
+	"strings"
 )
 
 type DocumentRepository struct {
@@ -20,11 +22,17 @@ func NewDocumentRepository(database *config.Database) *DocumentRepository {
 
 // Create : сохраняем новый документ
 func (r *DocumentRepository) Create(ctx context.Context, exec sqlx.ExtContext, document *model.Document) error {
+	token, err := util.GenerateUniqueToken(ctx, r.DB, 32)
+	if err != nil {
+		return err
+	}
+	document.AccessToken = token
+
 	query := `
-		INSERT INTO documents (uuid, owner_uuid, filename_original, size_bytes, mime_type, sha256, storage_path)
-    	VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO documents (uuid, owner_uuid, filename_original, size_bytes, mime_type, sha256, storage_path, is_file, is_public, access_token)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
-	_, err := exec.ExecContext(
+	_, err = exec.ExecContext(
 		ctx,
 		query,
 		document.UUID,
@@ -33,128 +41,195 @@ func (r *DocumentRepository) Create(ctx context.Context, exec sqlx.ExtContext, d
 		document.SizeBytes,
 		document.MimeType,
 		document.Sha256,
-		document.StoragePath)
-
-	return err
-}
-
-// ShareDocument : добавляет пользователя к документу для совместного доступа
-func (r *DocumentRepository) ShareDocument(ctx context.Context, exec sqlx.ExtContext, documentUUID string, ownerUUID string, targetUserUUID string, permission string) error {
-	var exists bool
-	err := sqlx.GetContext(ctx, exec, &exists, `
-        SELECT EXISTS (
-            SELECT 1
-            FROM documents
-            WHERE uuid = $1 AND owner_uuid = $2
-        )
-    `, documentUUID, ownerUUID)
-	if err != nil {
-		return err
-	}
-	if exists == false {
-		return fmt.Errorf("доступ запрещен")
-	}
-
-	_, err = exec.ExecContext(ctx, `
-        INSERT INTO document_shares (document_uuid, target_user_uuid, permission, created_at)
-        VALUES ($1, $2, $3, NOW())
-        ON CONFLICT (document_uuid, target_user_uuid) DO UPDATE
-        SET permission = EXCLUDED.permission, created_at = NOW()
-    `, documentUUID, targetUserUUID, permission)
+		document.StoragePath,
+		document.IsFile,
+		document.IsPublic,
+		document.AccessToken,
+	)
 
 	if err != nil {
-		return util.LogError("не удалось сохранить изменения", err)
+		return util.LogError("[DocumentRepo] не удалось вставить данные в БД", err)
 	}
+
 	return nil
 }
 
-// GetByID : возвращаем документ, если юзер владелец или в shares
-func (r *DocumentRepository) GetByID(ctx context.Context, exec sqlx.ExtContext, documentUUID string, userID string) (*model.Document, error) {
+// GetByUUID : возвращает документ по UUID, если юзер владелец или в shares
+func (r *DocumentRepository) GetByUUID(ctx context.Context, exec sqlx.ExtContext, documentUUID string, userID string) (*model.Document, []string, error) {
 	query := `
 		SELECT d.uuid, d.owner_uuid, d.filename_original, d.size_bytes, d.mime_type,
-		       d.sha256, d.storage_path, d.version, d.created_at, d.updated_at, d.deleted_at
+		       d.sha256, d.storage_path, d.is_file, d.is_public, d.access_token,
+		       d.created_at, d.updated_at, d.deleted_at
 		FROM documents AS d
-		LEFT JOIN document_shares AS s
-		  ON d.uuid = s.document_uuid AND s.target_user_uuid = $2
-		WHERE d.uuid = $1 AND (d.owner_uuid = $2 OR s.target_user_uuid IS NOT NULL)
+		LEFT JOIN document_grants AS g
+		  ON d.uuid = g.document_uuid AND g.target_user_uuid = $2
+		WHERE d.uuid = $1 AND (d.owner_uuid = $2 OR g.target_user_uuid IS NOT NULL)
 	`
 
 	var document model.Document
 	err := sqlx.GetContext(ctx, exec, &document, query, documentUUID, userID)
 	if err != nil {
-		return nil, err
+		return nil, nil, util.LogError("[DocumentRepo] не удалось получить документ по UUID", err)
+	}
+
+	var grants []string
+	grantQuery := `
+		SELECT u.login
+		FROM users u
+		INNER JOIN document_grants g ON u.uuid = g.target_user_uuid
+		WHERE g.document_uuid = $1
+	`
+	err = sqlx.SelectContext(ctx, exec, &grants, grantQuery, documentUUID)
+	if err != nil {
+		return nil, nil, util.LogError("[DocumentRepo] не удалось получить список доступа", err)
+	}
+
+	return &document, grants, nil
+}
+
+// GetByToken : возвращает публичный документ только по токену
+func (r *DocumentRepository) GetByToken(ctx context.Context, exec sqlx.ExtContext, token string) (*model.Document, error) {
+	query := `
+		SELECT d.uuid, d.owner_uuid, d.filename_original, d.size_bytes, d.mime_type,
+		       d.sha256, d.storage_path, d.is_file, d.is_public, d.access_token,
+		       d.created_at, d.updated_at, d.deleted_at
+		FROM documents AS d
+		WHERE d.access_token = $1
+	`
+
+	var document model.Document
+	err := sqlx.GetContext(ctx, exec, &document, query, token)
+	if err != nil {
+		return nil, util.LogError("[DocumentRepo] не удалось получить публичный документ по токену", err)
 	}
 
 	return &document, nil
 }
 
-// ListByOwner : выдаём список документов владельца (cursor по created_at)
-// Вместо стандартного OFFSET/LIMIT метод применяет cursor-based pagination
-// cursor здесь — строка, которая хранит значение created_at последнего документа из предыдущей выборки
-// При следующем запросе этот cursor передается в БД и ты получаешь документы после (или до) него
-func (r *DocumentRepository) ListByOwner(ctx context.Context, exec sqlx.ExtContext, ownerUUID string, cursor string, limit int) ([]model.Document, string, error) {
-	queryDesc := `
-		SELECT uuid, owner_uuid, filename_original, size_bytes, mime_type,
-			   sha256, storage_path, version, created_at, updated_at, deleted_at
-		FROM documents
-		WHERE owner_uuid = $1 AND deleted_at IS NULL AND created_at < $2
-		ORDER BY created_at DESC
-		LIMIT $3
-	`
-	queryAsc := `
-		SELECT uuid, owner_uuid, filename_original, storage_path, size_bytes, created_at, version
-		FROM documents
-		WHERE owner_uuid = $1 AND created_at > $2
-		ORDER BY created_at ASC
-		LIMIT $3
-	`
+func (r *DocumentRepository) GetPublicByUUID(ctx context.Context, exec sqlx.ExtContext, uuid string) (*model.Document, error) {
+	query := `
+        SELECT d.uuid, d.owner_uuid, d.filename_original, d.size_bytes, d.mime_type,
+               d.sha256, d.storage_path, d.is_file, d.is_public, d.access_token,
+               d.created_at, d.updated_at, d.deleted_at
+        FROM documents AS d
+        WHERE d.is_public = true AND d.uuid = $1
+    `
+	var document model.Document
+	err := sqlx.GetContext(ctx, exec, &document, query, uuid)
+	if err != nil {
+		return nil, util.LogError("[DocumentRepo] не удалось получить публичный документ по UUID", err)
+	}
+	return &document, nil
+}
+
+func (r *DocumentRepository) GetPublicByToken(ctx context.Context, exec sqlx.ExtContext, token string) (*model.Document, error) {
+	query := `
+        SELECT d.uuid, d.owner_uuid, d.filename_original, d.size_bytes, d.mime_type,
+               d.sha256, d.storage_path, d.is_file, d.is_public, d.access_token,
+               d.created_at, d.updated_at, d.deleted_at
+        FROM documents AS d
+        WHERE d.is_public = true AND d.access_token = $1
+    `
+	var document model.Document
+	err := sqlx.GetContext(ctx, exec, &document, query, token)
+	if err != nil {
+		return nil, util.LogError("[DocumentRepo] не удалось получить публичный документ по токену", err)
+	}
+	return &document, nil
+}
+
+// ListDocuments возвращает список документов пользователя с фильтрацией и сортировкой
+func (r *DocumentRepository) ListDocuments(
+	ctx context.Context,
+	exec sqlx.ExtContext,
+	ownerUUID string,
+	login string, // для чужих документов
+	filterKey string,
+	filterValue string,
+	limit int,
+) ([]model.Document, error) {
+
+	var sb strings.Builder
+	args := []interface{}{ownerUUID} // $1 — всегда ownerUUID
+
+	sb.WriteString(`
+		SELECT 
+			d.uuid,
+			d.filename_original,
+			d.mime_type,
+			true AS is_file,
+			d.is_public,
+			d.created_at,
+			d.owner_uuid,
+			d.size_bytes,
+			d.sha256,
+			d.storage_path,
+			d.access_token,
+			d.updated_at,
+			d.deleted_at
+		FROM documents AS d
+		LEFT JOIN users AS u ON u.uuid = d.owner_uuid
+		WHERE d.deleted_at IS NULL
+		  AND d.owner_uuid = $1::uuid
+	`)
+
+	// фильтр по чужому логину
+	if login != "" {
+		sb.WriteString(" AND u.login = $2")
+		args = append(args, login)
+	}
+
+	// динамические фильтры
+	paramIndex := len(args) + 1
+	if filterKey != "" && filterValue != "" {
+		switch filterKey {
+		case "name":
+			sb.WriteString(" AND d.filename_original ILIKE $" + strconv.Itoa(paramIndex))
+			args = append(args, "%"+filterValue+"%")
+		case "mime":
+			sb.WriteString(" AND d.mime_type = $" + strconv.Itoa(paramIndex))
+			args = append(args, filterValue)
+		case "public":
+			sb.WriteString(" AND d.is_public = $" + strconv.Itoa(paramIndex))
+			args = append(args, strings.ToLower(filterValue) == "true")
+		case "created":
+			sb.WriteString(" AND DATE(d.created_at) = $" + strconv.Itoa(paramIndex))
+			args = append(args, filterValue)
+		}
+		paramIndex++
+	}
+
+	sb.WriteString(" ORDER BY d.filename_original ASC, d.created_at ASC")
+
+	// лимит
+	if limit > 0 {
+		sb.WriteString(" LIMIT $" + strconv.Itoa(len(args)+1))
+		args = append(args, limit)
+	}
 
 	docs := []model.Document{}
-	var rows *sqlx.Rows
-	var err error
-
-	if cursor == "" {
-		rows, err = exec.QueryxContext(ctx, queryDesc, ownerUUID, cursor, limit)
-	} else {
-		rows, err = exec.QueryxContext(ctx, queryAsc, ownerUUID, cursor, limit)
-	}
-	if err != nil {
-		return nil, "", err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var document model.Document
-		if err := rows.StructScan(&document); err != nil {
-			return nil, "", err
-		}
-		docs = append(docs, document)
+	if err := sqlx.SelectContext(ctx, exec, &docs, sb.String(), args...); err != nil {
+		return nil, util.LogError("[DocumentRepo] ошибка запроса списка документов", err)
 	}
 
-	var nextCursor string
-	if len(docs) > 0 {
-		nextCursor = docs[len(docs)-1].CreatedAt.Format("2006-01-02T15:04:05.999999Z07:00")
-	}
-
-	return docs, nextCursor, nil
+	return docs, nil
 }
 
 // Delete : только владелец может удалить документ
 func (r *DocumentRepository) Delete(ctx context.Context, exec sqlx.ExtContext, documentUUID string, ownerUUID string) (string, error) {
 	query := `
-		UPDATE documents
-		SET deleted_at = NOW()
+		DELETE FROM documents
 		WHERE uuid = $1 AND owner_uuid = $2
-		RETURNING storage_path
+		RETURNING uuid
 	`
 
-	var storagePath string
-	err := sqlx.GetContext(ctx, exec, &storagePath, query, documentUUID, ownerUUID)
+	var deletedUUID string
+	err := sqlx.GetContext(ctx, exec, &deletedUUID, query, documentUUID, ownerUUID)
 	if err != nil {
-		return "", err
+		return "", util.LogError("[DocumentRepo] не удалось удалить документ", err)
 	}
 
-	return storagePath, nil
+	return deletedUUID, nil
 }
 
 func (r *DocumentRepository) BeginTX(ctx context.Context) (sqlx.ExtContext, func() error, error) {

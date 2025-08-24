@@ -18,9 +18,10 @@ type UserRepository interface {
 }
 
 type UserService interface {
-	Register(ctx context.Context, email string, password string, ipAddress string) (*model.TokensPair, error)
+	Register(ctx context.Context, adminToken string, login string, password string, ipAddress string) (*model.TokensPair, error)
 	GetUser(ctx context.Context, uuid string) (*model.User, error)
 	UpdateUser(ctx context.Context, updatedUser *model.User) error
 	UpdatePassword(ctx context.Context, uuid string, newPassword string) error
 	DeleteUser(ctx context.Context, uuid string) error
+	ListUsers(ctx context.Context, adminToken string, cursor string, limit int) ([]*model.User, string, error)
 }
