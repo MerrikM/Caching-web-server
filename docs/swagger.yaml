@@ -1,0 +1,1341 @@
+definitions:
+  model.User:
+    properties:
+      created_at:
+        type: string
+      login:
+        type: string
+      uuid:
+        type: string
+    type: object
+  requestresponse.CreateDocumentData:
+    properties:
+      file:
+        type: string
+      json:
+        additionalProperties: true
+        type: object
+    type: object
+  requestresponse.CreateDocumentResponse:
+    properties:
+      data:
+        $ref: '#/definitions/requestresponse.CreateDocumentData'
+    type: object
+  requestresponse.CurrentUserResponse:
+    properties:
+      response:
+        properties:
+          user_uuid:
+            example: b6a1e1c4-4b1d-4f1e-8b29-1234567890ab
+            type: string
+        type: object
+    type: object
+  requestresponse.DocumentResponse:
+    properties:
+      created:
+        example: "2025-08-23T12:34:56Z"
+        type: string
+      file:
+        example: true
+        type: boolean
+      get_url:
+        type: string
+      grant:
+        example:
+        - '["login1"'
+        - '"login2"]'
+        items:
+          type: string
+        type: array
+      id:
+        example: qwdj1q4o34u34ih759ou1
+        type: string
+      mime:
+        example: image/jpg
+        type: string
+      name:
+        example: photo.jpg
+        type: string
+      public:
+        example: false
+        type: boolean
+    type: object
+  requestresponse.ErrorDetail:
+    properties:
+      code:
+        example: 400
+        type: integer
+      text:
+        example: 'for example: invalid login or password'
+        type: string
+    type: object
+  requestresponse.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/requestresponse.ErrorDetail'
+    type: object
+  requestresponse.GetDocumentData:
+    properties:
+      document:
+        $ref: '#/definitions/requestresponse.DocumentResponse'
+    type: object
+  requestresponse.GetDocumentResponse:
+    properties:
+      data:
+        $ref: '#/definitions/requestresponse.GetDocumentData'
+      expires_in:
+        type: string
+    type: object
+  requestresponse.ListDocumentsResponse:
+    properties:
+      count:
+        example: 10
+        type: integer
+      data:
+        properties:
+          docs:
+            items:
+              $ref: '#/definitions/requestresponse.DocumentResponse'
+            type: array
+        type: object
+      next_cursor:
+        example: qwdj1q4o34u34ih759ou1
+        type: string
+    type: object
+  requestresponse.ListUsersResponse:
+    properties:
+      data:
+        properties:
+          next_cursor:
+            type: string
+          users:
+            items:
+              $ref: '#/definitions/model.User'
+            type: array
+        type: object
+    type: object
+  requestresponse.LoginRequest:
+    properties:
+      login:
+        example: user1
+        type: string
+      password:
+        example: P@ssw0rd123
+        type: string
+    type: object
+  requestresponse.LogoutItem:
+    properties:
+      deleted:
+        example: true
+        type: boolean
+      document_uuid:
+        example: qwdj1q4o34u34ih759ou1
+        type: string
+    type: object
+  requestresponse.LogoutResponse:
+    properties:
+      response:
+        items:
+          $ref: '#/definitions/requestresponse.LogoutItem'
+        type: array
+    type: object
+  requestresponse.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        example: sfuqwejqjoiu93e29
+        type: string
+    type: object
+  requestresponse.RefreshTokenResponse:
+    properties:
+      response:
+        properties:
+          access_token:
+            example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+            type: string
+          refresh_token:
+            example: sfuqwejqjoiu93e29
+            type: string
+        type: object
+    type: object
+  requestresponse.RegisterData:
+    properties:
+      login:
+        type: string
+    type: object
+  requestresponse.RegisterRequest:
+    properties:
+      login:
+        example: newuser123
+        type: string
+      password:
+        example: P@ssw0rd!
+        type: string
+      token:
+        example: fixed_admin_token
+        type: string
+    type: object
+  requestresponse.RegisterResponse:
+    properties:
+      response:
+        $ref: '#/definitions/requestresponse.RegisterData'
+    type: object
+  requestresponse.RemoveGrantRequest:
+    properties:
+      target_user_uuid:
+        type: string
+    required:
+    - target_user_uuid
+    type: object
+  requestresponse.ResponseMessage:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/requestresponse.ErrorResponse'
+      response:
+        additionalProperties: true
+        type: object
+    type: object
+  requestresponse.ShareDocumentRequest:
+    properties:
+      target_user_uuid:
+        example: user-uuid-1234
+        type: string
+    type: object
+  requestresponse.SuccessResponse:
+    properties:
+      message:
+        example: Операция выполнена успешно
+        type: string
+    type: object
+  requestresponse.UpdatePasswordRequest:
+    properties:
+      new_password:
+        example: P@ssw0rd123
+        type: string
+    type: object
+  requestresponse.UpdatePasswordResponse:
+    properties:
+      response:
+        properties:
+          updated:
+            example: true
+            type: boolean
+        type: object
+    type: object
+  requestresponse.UpdateUserRequest:
+    properties:
+      login:
+        example: newlogin123
+        type: string
+    type: object
+  requestresponse.UpdateUserResponse:
+    properties:
+      response:
+        properties:
+          login:
+            example: newlogin123
+            type: string
+        type: object
+    type: object
+  requestresponse.UserResponse:
+    properties:
+      data:
+        properties:
+          login:
+            example: user@example.com
+            type: string
+          uuid:
+            example: 123e4567-e89b-12d3-a456-426614174000
+            type: string
+        type: object
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API Для работы с документами
+  title: Caching-web-server
+  version: "1.0"
+paths:
+  /api/auth:
+    post:
+      consumes:
+      - application/json
+      description: Получение токена по логину и паролю
+      parameters:
+      - description: Тело запроса
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requestresponse.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Доступ успешно удалён
+          schema:
+            $ref: '#/definitions/requestresponse.ResponseMessage'
+        "400":
+          description: Некорректный запрос
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Доступ запрещён
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Документ не найден
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Аутентификация пользователя
+      tags:
+      - Authentication
+  /api/auth/{token}:
+    delete:
+      description: Инвалидирует refresh-токен и завершает сессию пользователя по access-токену,
+        переданному в URL.
+      parameters:
+      - description: Access-токен пользователя (JWT)
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.LogoutResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Завершение авторизованной сессии
+      tags:
+      - Authentication
+  /api/auth/me:
+    get:
+      description: Возвращает UUID пользователя, который авторизован в системе
+      parameters:
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.CurrentUserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение UUID текущего пользователя
+      tags:
+      - Authentication
+    head:
+      description: Возвращает UUID пользователя, который авторизован в системе
+      parameters:
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.CurrentUserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение UUID текущего пользователя
+      tags:
+      - Authentication
+  /api/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Обновляет пару токенов (access и refresh) по действующему access
+        и refresh токену
+      parameters:
+      - description: Тело запроса
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requestresponse.RefreshTokenRequest'
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.RefreshTokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Обновление токенов
+      tags:
+      - Authentication
+  /api/docs:
+    get:
+      description: Возвращает список документов с фильтрацией и пагинацией
+      parameters:
+      - description: Login пользователя для просмотра чужих документов
+        in: query
+        name: login
+        type: string
+      - description: Имя колонки для фильтрации
+        in: query
+        name: key
+        type: string
+      - description: Значение фильтра
+        in: query
+        name: value
+        type: string
+      - default: 20
+        description: Лимит документов на странице
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.ListDocumentsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Список документов
+      tags:
+      - Documents
+    head:
+      description: Возвращает заголовки списка документов без тела (для HEAD запроса)
+      parameters:
+      - description: Login пользователя для просмотра чужих документов
+        in: query
+        name: login
+        type: string
+      - description: Имя колонки для фильтрации
+        in: query
+        name: key
+        type: string
+      - description: Значение фильтра
+        in: query
+        name: value
+        type: string
+      - default: 20
+        description: Лимит документов на странице
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Заголовки с информацией о документах
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Заголовки списка документов
+      tags:
+      - Documents
+    post:
+      consumes:
+      - multipart/form-data
+      description: Загружает файл и его мета-данные, поддерживает multipart/form-data.
+      parameters:
+      - description: Введите true, чтобы документ был публичным, либо false, чтобы
+          вы сами давали доступ
+        in: formData
+        name: public
+        required: true
+        type: string
+      - description: Файл документа
+        in: formData
+        name: file
+        required: true
+        type: file
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Успешный ответ, содержит данные документа и pre-signed URL
+          schema:
+            $ref: '#/definitions/requestresponse.CreateDocumentResponse'
+        "400":
+          description: Неверный формат запроса или мета-данных
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Загрузка нового документа
+      tags:
+      - Documents
+  /api/docs/{doc_id}:
+    delete:
+      description: Помечает документ как удаленный и удаляет файл из хранилища
+      parameters:
+      - description: UUID документа
+        in: path
+        name: doc_id
+        required: true
+        type: string
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Удалить документ
+      tags:
+      - Documents
+    get:
+      consumes:
+      - application/json
+      description: Возвращает документ в JSON или файл по ссылке.
+      parameters:
+      - description: UUID документа
+        in: path
+        name: doc_id
+        required: true
+        type: string
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.GetDocumentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение документа по ID
+      tags:
+      - Documents
+    head:
+      consumes:
+      - application/json
+      description: Возвращает документ в JSON или файл по ссылке.
+      parameters:
+      - description: UUID документа
+        in: path
+        name: doc_id
+        required: true
+        type: string
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.GetDocumentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение документа по ID
+      tags:
+      - Documents
+  /api/docs/{doc_id}/remove-grant:
+    post:
+      consumes:
+      - application/json
+      description: Удаляет пользователя из списка доступа к документу (grant). Доступно
+        только владельцу документа.
+      parameters:
+      - description: UUID документа
+        in: path
+        name: doc_id
+        required: true
+        type: string
+      - description: Тело запроса, содержит UUID пользователя, которому нужно убрать
+          доступ
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requestresponse.RemoveGrantRequest'
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Доступ успешно удален
+          schema:
+            $ref: '#/definitions/requestresponse.ResponseMessage'
+        "400":
+          description: Некорректный запрос
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Доступ запрещен
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Документ не найден
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Удаление доступа к документу
+      tags:
+      - Documents
+  /api/docs/{doc_id}/share:
+    post:
+      consumes:
+      - application/json
+      description: Добавляет пользователя к документу для совместного доступа
+      parameters:
+      - description: UUID документа
+        in: path
+        name: doc_id
+        required: true
+        type: string
+      - description: Тело запроса
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requestresponse.ShareDocumentRequest'
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Доступ успешно предоставлен
+          schema:
+            $ref: '#/definitions/requestresponse.ResponseMessage'
+        "400":
+          description: Некорректный запрос
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Доступ запрещен
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Документ не найден
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Предоставление доступа к документу
+      tags:
+      - Documents
+  /api/docs/public/{token}:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает документ в JSON или файл по ссылке. Доступ к документу
+        по его токену, авторизация не требуется.
+      parameters:
+      - description: Токен документа
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.GetDocumentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение документа по токену
+      tags:
+      - Documents
+    head:
+      consumes:
+      - application/json
+      description: Возвращает документ в JSON или файл по ссылке. Доступ к документу
+        по его токену, авторизация не требуется.
+      parameters:
+      - description: Токен документа
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.GetDocumentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение документа по токену
+      tags:
+      - Documents
+  /api/register:
+    post:
+      consumes:
+      - application/json
+      description: 'Создает нового пользователя с логином и паролем. Требуется токен
+        администратора (токен в config.yaml: "super-secret-admin-token").'
+      parameters:
+      - description: Тело запроса
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requestresponse.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.RegisterResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Регистрация нового пользователя
+      tags:
+      - Users
+  /api/users:
+    get:
+      description: Возвращает список пользователей с постраничной навигацией (cursor-based).
+        Доступно только авторизованным пользователям или администратору.
+      parameters:
+      - description: Курсор для пагинации
+        in: query
+        name: cursor
+        type: string
+      - default: 50
+        description: Количество пользователей в списке
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.ListUsersResponse'
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Доступ запрещён
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получение списка пользователей
+      tags:
+      - Users
+    head:
+      description: Возвращает список пользователей с постраничной навигацией (cursor-based).
+        Доступно только авторизованным пользователям или администратору.
+      parameters:
+      - description: Курсор для пагинации
+        in: query
+        name: cursor
+        type: string
+      - default: 50
+        description: Количество пользователей в списке
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.ListUsersResponse'
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Доступ запрещён
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получение списка пользователей
+      tags:
+      - Users
+  /api/users/{uuid}:
+    delete:
+      description: Удаляет пользователя. Доступен только владельцу или администратору.
+      parameters:
+      - description: UUID пользователя
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Пользователь успешно удалён
+        "403":
+          description: Доступ запрещён
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Удаление пользователя
+      tags:
+      - Users
+    get:
+      description: Возвращает данные пользователя. Доступен только самому пользователю.
+      parameters:
+      - description: UUID пользователя
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.UserResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение информации о пользователе
+      tags:
+      - Users
+    head:
+      description: Возвращает данные пользователя. Доступен только самому пользователю.
+      parameters:
+      - description: UUID пользователя
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.UserResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение информации о пользователе
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Позволяет пользователю обновить свой логин.
+      parameters:
+      - description: UUID пользователя
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: Тело запроса
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requestresponse.UpdateUserRequest'
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.UpdateUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Обновление данных пользователя
+      tags:
+      - Users
+  /api/users/{uuid}/password:
+    put:
+      consumes:
+      - application/json
+      description: Позволяет пользователю обновить свой пароль. Доступен только владельцу.
+      parameters:
+      - description: UUID пользователя
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: Тело запроса
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requestresponse.UpdatePasswordRequest'
+      - default: Bearer <access_token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.UpdatePasswordResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Обновление пароля пользователя
+      tags:
+      - Users
+  /public/docs/{doc_id}:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает документ, если он публичный (is_public = true).
+      parameters:
+      - description: UUID документа
+        in: path
+        name: doc_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.GetDocumentResponse'
+        "403":
+          description: Документ не публичный
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение публичного документа по UUID
+      tags:
+      - Public Documents
+    head:
+      consumes:
+      - application/json
+      description: Возвращает документ, если он публичный (is_public = true).
+      parameters:
+      - description: UUID документа
+        in: path
+        name: doc_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.GetDocumentResponse'
+        "403":
+          description: Документ не публичный
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение публичного документа по UUID
+      tags:
+      - Public Documents
+  /public/docs/token/{token}:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает документ, если он публичный (is_public = true).
+      parameters:
+      - description: Токен доступа к документу
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.GetDocumentResponse'
+        "403":
+          description: Документ не публичный
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение публичного документа по токену
+      tags:
+      - Public Documents
+    head:
+      consumes:
+      - application/json
+      description: Возвращает документ, если он публичный (is_public = true).
+      parameters:
+      - description: Токен доступа к документу
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/requestresponse.GetDocumentResponse'
+        "403":
+          description: Документ не публичный
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/requestresponse.ErrorResponse'
+      summary: Получение публичного документа по токену
+      tags:
+      - Public Documents
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

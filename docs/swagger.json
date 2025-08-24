@@ -1,0 +1,2001 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "REST API Для работы с документами",
+        "title": "Caching-web-server",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "paths": {
+        "/api/auth": {
+            "post": {
+                "description": "Получение токена по логину и паролю",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Аутентификация пользователя",
+                "parameters": [
+                    {
+                        "description": "Тело запроса",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Доступ успешно удалён",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ResponseMessage"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещён",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Документ не найден",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/me": {
+            "get": {
+                "description": "Возвращает UUID пользователя, который авторизован в системе",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Получение UUID текущего пользователя",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.CurrentUserResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "description": "Возвращает UUID пользователя, который авторизован в системе",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Получение UUID текущего пользователя",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.CurrentUserResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/refresh": {
+            "post": {
+                "description": "Обновляет пару токенов (access и refresh) по действующему access и refresh токену",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Обновление токенов",
+                "parameters": [
+                    {
+                        "description": "Тело запроса",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.RefreshTokenRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.RefreshTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/{token}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Инвалидирует refresh-токен и завершает сессию пользователя по access-токену, переданному в URL.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Завершение авторизованной сессии",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Access-токен пользователя (JWT)",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.LogoutResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/docs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает список документов с фильтрацией и пагинацией",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Список документов",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Login пользователя для просмотра чужих документов",
+                        "name": "login",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Имя колонки для фильтрации",
+                        "name": "key",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Значение фильтра",
+                        "name": "value",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Лимит документов на странице",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ListDocumentsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Загружает файл и его мета-данные, поддерживает multipart/form-data.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Загрузка нового документа",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Введите true, чтобы документ был публичным, либо false, чтобы вы сами давали доступ",
+                        "name": "public",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Файл документа",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Успешный ответ, содержит данные документа и pre-signed URL",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.CreateDocumentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный формат запроса или мета-данных",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает заголовки списка документов без тела (для HEAD запроса)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Заголовки списка документов",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Login пользователя для просмотра чужих документов",
+                        "name": "login",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Имя колонки для фильтрации",
+                        "name": "key",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Значение фильтра",
+                        "name": "value",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Лимит документов на странице",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Заголовки с информацией о документах"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/docs/public/{token}": {
+            "get": {
+                "description": "Возвращает документ в JSON или файл по ссылке. Доступ к документу по его токену, авторизация не требуется.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Получение документа по токену",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Токен документа",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.GetDocumentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "description": "Возвращает документ в JSON или файл по ссылке. Доступ к документу по его токену, авторизация не требуется.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Получение документа по токену",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Токен документа",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.GetDocumentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/docs/{doc_id}": {
+            "get": {
+                "description": "Возвращает документ в JSON или файл по ссылке.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Получение документа по ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID документа",
+                        "name": "doc_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.GetDocumentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Помечает документ как удаленный и удаляет файл из хранилища",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Удалить документ",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID документа",
+                        "name": "doc_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "description": "Возвращает документ в JSON или файл по ссылке.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Получение документа по ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID документа",
+                        "name": "doc_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.GetDocumentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/docs/{doc_id}/remove-grant": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет пользователя из списка доступа к документу (grant). Доступно только владельцу документа.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Удаление доступа к документу",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID документа",
+                        "name": "doc_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Тело запроса, содержит UUID пользователя, которому нужно убрать доступ",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.RemoveGrantRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Доступ успешно удален",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ResponseMessage"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещен",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Документ не найден",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/docs/{doc_id}/share": {
+            "post": {
+                "description": "Добавляет пользователя к документу для совместного доступа",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Предоставление доступа к документу",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID документа",
+                        "name": "doc_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Тело запроса",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ShareDocumentRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Доступ успешно предоставлен",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ResponseMessage"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещен",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Документ не найден",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/register": {
+            "post": {
+                "description": "Создает нового пользователя с логином и паролем. Требуется токен администратора (токен в config.yaml: \"super-secret-admin-token\").",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Регистрация нового пользователя",
+                "parameters": [
+                    {
+                        "description": "Тело запроса",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.RegisterResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает список пользователей с постраничной навигацией (cursor-based). Доступно только авторизованным пользователям или администратору.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Получение списка пользователей",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Курсор для пагинации",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Количество пользователей в списке",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ListUsersResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещён",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает список пользователей с постраничной навигацией (cursor-based). Доступно только авторизованным пользователям или администратору.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Получение списка пользователей",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Курсор для пагинации",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Количество пользователей в списке",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ListUsersResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещён",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/{uuid}": {
+            "get": {
+                "description": "Возвращает данные пользователя. Доступен только самому пользователю.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Получение информации о пользователе",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID пользователя",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.UserResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Позволяет пользователю обновить свой логин.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Обновление данных пользователя",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID пользователя",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Тело запроса",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.UpdateUserRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.UpdateUserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет пользователя. Доступен только владельцу или администратору.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Удаление пользователя",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID пользователя",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Пользователь успешно удалён"
+                    },
+                    "403": {
+                        "description": "Доступ запрещён",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "description": "Возвращает данные пользователя. Доступен только самому пользователю.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Получение информации о пользователе",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID пользователя",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.UserResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/{uuid}/password": {
+            "put": {
+                "description": "Позволяет пользователю обновить свой пароль. Доступен только владельцу.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Обновление пароля пользователя",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID пользователя",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Тело запроса",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.UpdatePasswordRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003caccess_token\u003e",
+                        "description": "Bearer токен",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.UpdatePasswordResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/public/docs/token/{token}": {
+            "get": {
+                "description": "Возвращает документ, если он публичный (is_public = true).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Documents"
+                ],
+                "summary": "Получение публичного документа по токену",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Токен доступа к документу",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.GetDocumentResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Документ не публичный",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "description": "Возвращает документ, если он публичный (is_public = true).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Documents"
+                ],
+                "summary": "Получение публичного документа по токену",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Токен доступа к документу",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.GetDocumentResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Документ не публичный",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/public/docs/{doc_id}": {
+            "get": {
+                "description": "Возвращает документ, если он публичный (is_public = true).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Documents"
+                ],
+                "summary": "Получение публичного документа по UUID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID документа",
+                        "name": "doc_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.GetDocumentResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Документ не публичный",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "description": "Возвращает документ, если он публичный (is_public = true).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Public Documents"
+                ],
+                "summary": "Получение публичного документа по UUID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID документа",
+                        "name": "doc_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.GetDocumentResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Документ не публичный",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/requestresponse.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "model.User": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "login": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "requestresponse.CreateDocumentData": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "type": "string"
+                },
+                "json": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "requestresponse.CreateDocumentResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/requestresponse.CreateDocumentData"
+                }
+            }
+        },
+        "requestresponse.CurrentUserResponse": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "object",
+                    "properties": {
+                        "user_uuid": {
+                            "type": "string",
+                            "example": "b6a1e1c4-4b1d-4f1e-8b29-1234567890ab"
+                        }
+                    }
+                }
+            }
+        },
+        "requestresponse.DocumentResponse": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "string",
+                    "example": "2025-08-23T12:34:56Z"
+                },
+                "file": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "get_url": {
+                    "type": "string"
+                },
+                "grant": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"login1\"",
+                        "\"login2\"]"
+                    ]
+                },
+                "id": {
+                    "type": "string",
+                    "example": "qwdj1q4o34u34ih759ou1"
+                },
+                "mime": {
+                    "type": "string",
+                    "example": "image/jpg"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "photo.jpg"
+                },
+                "public": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "requestresponse.ErrorDetail": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 400
+                },
+                "text": {
+                    "type": "string",
+                    "example": "for example: invalid login or password"
+                }
+            }
+        },
+        "requestresponse.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/requestresponse.ErrorDetail"
+                }
+            }
+        },
+        "requestresponse.GetDocumentData": {
+            "type": "object",
+            "properties": {
+                "document": {
+                    "$ref": "#/definitions/requestresponse.DocumentResponse"
+                }
+            }
+        },
+        "requestresponse.GetDocumentResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/requestresponse.GetDocumentData"
+                },
+                "expires_in": {
+                    "type": "string"
+                }
+            }
+        },
+        "requestresponse.ListDocumentsResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "docs": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/requestresponse.DocumentResponse"
+                            }
+                        }
+                    }
+                },
+                "next_cursor": {
+                    "type": "string",
+                    "example": "qwdj1q4o34u34ih759ou1"
+                }
+            }
+        },
+        "requestresponse.ListUsersResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "next_cursor": {
+                            "type": "string"
+                        },
+                        "users": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.User"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "requestresponse.LoginRequest": {
+            "type": "object",
+            "properties": {
+                "login": {
+                    "type": "string",
+                    "example": "user1"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "P@ssw0rd123"
+                }
+            }
+        },
+        "requestresponse.LogoutItem": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "document_uuid": {
+                    "type": "string",
+                    "example": "qwdj1q4o34u34ih759ou1"
+                }
+            }
+        },
+        "requestresponse.LogoutResponse": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/requestresponse.LogoutItem"
+                    }
+                }
+            }
+        },
+        "requestresponse.RefreshTokenRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string",
+                    "example": "sfuqwejqjoiu93e29"
+                }
+            }
+        },
+        "requestresponse.RefreshTokenResponse": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "object",
+                    "properties": {
+                        "access_token": {
+                            "type": "string",
+                            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        },
+                        "refresh_token": {
+                            "type": "string",
+                            "example": "sfuqwejqjoiu93e29"
+                        }
+                    }
+                }
+            }
+        },
+        "requestresponse.RegisterData": {
+            "type": "object",
+            "properties": {
+                "login": {
+                    "type": "string"
+                }
+            }
+        },
+        "requestresponse.RegisterRequest": {
+            "type": "object",
+            "properties": {
+                "login": {
+                    "type": "string",
+                    "example": "newuser123"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "P@ssw0rd!"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "fixed_admin_token"
+                }
+            }
+        },
+        "requestresponse.RegisterResponse": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "$ref": "#/definitions/requestresponse.RegisterData"
+                }
+            }
+        },
+        "requestresponse.RemoveGrantRequest": {
+            "type": "object",
+            "required": [
+                "target_user_uuid"
+            ],
+            "properties": {
+                "target_user_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "requestresponse.ResponseMessage": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "$ref": "#/definitions/requestresponse.ErrorResponse"
+                },
+                "response": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "requestresponse.ShareDocumentRequest": {
+            "type": "object",
+            "properties": {
+                "target_user_uuid": {
+                    "type": "string",
+                    "example": "user-uuid-1234"
+                }
+            }
+        },
+        "requestresponse.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Операция выполнена успешно"
+                }
+            }
+        },
+        "requestresponse.UpdatePasswordRequest": {
+            "type": "object",
+            "properties": {
+                "new_password": {
+                    "type": "string",
+                    "example": "P@ssw0rd123"
+                }
+            }
+        },
+        "requestresponse.UpdatePasswordResponse": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "object",
+                    "properties": {
+                        "updated": {
+                            "type": "boolean",
+                            "example": true
+                        }
+                    }
+                }
+            }
+        },
+        "requestresponse.UpdateUserRequest": {
+            "type": "object",
+            "properties": {
+                "login": {
+                    "type": "string",
+                    "example": "newlogin123"
+                }
+            }
+        },
+        "requestresponse.UpdateUserResponse": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "object",
+                    "properties": {
+                        "login": {
+                            "type": "string",
+                            "example": "newlogin123"
+                        }
+                    }
+                }
+            }
+        },
+        "requestresponse.UserResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "login": {
+                            "type": "string",
+                            "example": "user@example.com"
+                        },
+                        "uuid": {
+                            "type": "string",
+                            "example": "123e4567-e89b-12d3-a456-426614174000"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}
