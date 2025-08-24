@@ -1,11 +1,13 @@
 databaseConfig:
   dsn: "postgresql://user:password@localhost:5433/appdb?sslmode=disable"
 
+TTL:
+  s3_and_redis: 900
+
 redisConfig:
   address: "localhost:6379"
   password: ""
   database: 0
-  ttl: 3600
 
 s3Config:
   bucket: "my-s3-bucket"
@@ -17,8 +19,11 @@ serverAddr: ":8080"
 
 jwt:
   secret_key: "8fb90cf688f1f46a5a59711b9a8804c441e86513b7909fefb1b8abfc78aa500c"
-  access_token_ttl: "5m"
+  access_token_ttl: "90m"
   refresh_token_ttl: "10h"
 
 webhook:
   url: "https://webhook.site/673e03a4-b1bb-4546-88fa-9a521c61a1d0"
+
+admin:
+  admin_token: "super-secret-admin-token"

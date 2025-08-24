@@ -30,3 +30,11 @@ type WebhookConfig struct {
 	URL     string `yaml:"url"`
 	Timeout string `yaml:"timeout"`
 }
+
+type AdminConfig struct {
+	AdminToken string `yaml:"admin_token"`
+}
+
+type TTL struct {
+	S3AndRedis int `yaml:"s3_and_redis"`
+}

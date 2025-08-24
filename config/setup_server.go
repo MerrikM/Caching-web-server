@@ -14,6 +14,8 @@ type AppConfig struct {
 	S3Config       S3Config       `yaml:"s3Config"`
 	JWT            JWTConfig      `yaml:"jwt"`
 	Webhook        WebhookConfig  `yaml:"webhook"`
+	Admin          AdminConfig    `yaml:"admin"`
+	TTL            TTL            `yaml:"TTL"`
 }
 
 func LoadConfig(path string) (*AppConfig, error) {
