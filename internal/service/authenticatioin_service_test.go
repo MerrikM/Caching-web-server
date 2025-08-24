@@ -1,435 +1,436 @@
-package service
+package service_test
 
 import (
-	"MEDODS_TestProject/config"
-	"MEDODS_TestProject/internal/model"
-	"MEDODS_TestProject/internal/security"
+	"caching-web-server/config"
+	"caching-web-server/internal/model"
+	"caching-web-server/internal/security"
+	"caching-web-server/internal/service"
 	"context"
-	"fmt"
+	"errors"
+	"github.com/jmoiron/sqlx"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"golang.org/x/crypto/bcrypt"
 )
 
-type MockJWTRepository struct {
+// ===== MOCKS =====
+
+// MockUserRepository
+type MockUserRepository struct {
 	mock.Mock
 }
 
+func (m *MockUserRepository) FindByEmail(ctx context.Context, exec sqlx.ExtContext, email string) (*model.User, error) {
+	args := m.Called(ctx, exec, email)
+	if u, ok := args.Get(0).(*model.User); ok {
+		return u, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+// MockJWTService
 type MockJWTService struct {
 	mock.Mock
 }
 
-func testConfig() *config.Config {
-	return &config.Config{
-		JWT: config.JWTConfig{
-			SecretKey:       "test-secret",
-			AccessTokenTTL:  "15m",
-			RefreshTokenTTL: "24h",
-		},
-		Webhook: config.WebhookConfig{
-			URL: "http://example.com/webhook",
-		},
-	}
-}
-
 func (m *MockJWTService) GenerateAccessRefreshTokens(userUUID string) (*model.TokensPair, *model.RefreshToken, error) {
 	args := m.Called(userUUID)
-	return args.Get(0).(*model.TokensPair), args.Get(1).(*model.RefreshToken), args.Error(2)
+
+	var tokens *model.TokensPair
+	if t := args.Get(0); t != nil {
+		tokens = t.(*model.TokensPair)
+	}
+
+	var refresh *model.RefreshToken
+	if r := args.Get(1); r != nil {
+		refresh = r.(*model.RefreshToken)
+	}
+
+	return tokens, refresh, args.Error(2)
+}
+
+// MockJWTRepo
+type MockJWTRepo struct {
+	mock.Mock
+}
+
+func (m *MockJWTRepo) SaveRefreshToken(ctx context.Context, refreshToken *model.RefreshToken, ip string) error {
+	args := m.Called(ctx, refreshToken, ip)
+	return args.Error(0)
+}
+
+// ==== ЗАГЛУШКИ, ЧТОБЫ ИМПЛЕМЕНТИРОВАТЬ ИНТЕРФЕЙСЫ ====
+func (m *MockJWTRepo) FindByUUID(ctx context.Context, uuid string) (*model.RefreshToken, error) {
+	args := m.Called(ctx, uuid)
+	if token, ok := args.Get(0).(*model.RefreshToken); ok {
+		return token, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockJWTRepo) MarkRefreshTokenUsedByUUID(ctx context.Context, uuid string) error {
+	args := m.Called(ctx, uuid)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) CreateUser(ctx context.Context, exec sqlx.ExtContext, user *model.User) (*model.User, error) {
+	args := m.Called(ctx, exec, user)
+	if u, ok := args.Get(0).(*model.User); ok {
+		return u, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) FindByUUID(ctx context.Context, exec sqlx.ExtContext, uuid string) (*model.User, error) {
+	args := m.Called(ctx, exec, uuid)
+	if u, ok := args.Get(0).(*model.User); ok {
+		return u, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) UpdateUser(ctx context.Context, exec sqlx.ExtContext, user *model.User) error {
+	args := m.Called(ctx, exec, user)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) UpdatePassword(ctx context.Context, exec sqlx.ExtContext, uuid string, newPasswordHash string) error {
+	args := m.Called(ctx, exec, uuid, newPasswordHash)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) DeleteUser(ctx context.Context, exec sqlx.ExtContext, uuid string) error {
+	args := m.Called(ctx, exec, uuid)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) ListUsers(ctx context.Context, exec sqlx.ExtContext, cursor string, limit int) ([]*model.User, string, error) {
+	args := m.Called(ctx, exec, cursor, limit)
+	if users, ok := args.Get(0).([]*model.User); ok {
+		return users, args.String(1), args.Error(2)
+	}
+	return nil, "", args.Error(2)
+}
+
+func (m *MockUserRepository) Exists(ctx context.Context, exec sqlx.ExtContext, uuid string) (bool, error) {
+	args := m.Called(ctx, exec, uuid)
+	return args.Bool(0), args.Error(1)
 }
 
 func (m *MockJWTService) ValidateJWT(tokenString string, secret []byte) (*security.Claims, error) {
 	args := m.Called(tokenString, secret)
-	claims, _ := args.Get(0).(*security.Claims)
-	return claims, args.Error(1)
-}
-
-func (m *MockJWTRepository) FindByUUID(ctx context.Context, uuid string) (*model.RefreshToken, error) {
-	args := m.Called(ctx, uuid)
-	token := args.Get(0)
-	if token == nil {
-		return nil, args.Error(1)
+	if claims, ok := args.Get(0).(*security.Claims); ok {
+		return claims, args.Error(1)
 	}
-	return token.(*model.RefreshToken), args.Error(1)
+	return nil, args.Error(1)
 }
 
-func (m *MockJWTRepository) MarkRefreshTokenUsedByUUID(ctx context.Context, uuid string) error {
-	return m.Called(ctx, uuid).Error(0)
-}
+// ===== HELPERS =====
 
-func (m *MockJWTRepository) SaveRefreshToken(ctx context.Context, token *model.RefreshToken) error {
-	return m.Called(ctx, token).Error(0)
-}
-
-// 1
-func TestRefreshToken_InvalidAccessToken(t *testing.T) {
-	ctx := context.Background()
+func newTestAuthService() (*service.AuthenticationService, *MockUserRepository, *MockJWTService, *MockJWTRepo) {
+	mockUserRepo := new(MockUserRepository)
 	mockJWTService := new(MockJWTService)
+	mockJWTRepo := new(MockJWTRepo)
 
-	authService := &AuthenticationService{
-		JWTService: mockJWTService,
-		Config:     testConfig(),
+	svc := service.NewAuthenticationService(
+		mockJWTRepo,
+		&config.AppConfig{}, // если в тестах что-то нужно от конфига — можно заполнить
+		mockJWTService,
+		mockUserRepo,
+	)
+
+	return svc, mockUserRepo, mockJWTService, mockJWTRepo
+}
+
+// ===== TESTS =====
+
+// 1. Нет БД в контексте
+func TestLogin_NoDBInContext(t *testing.T) {
+	svc, _, _, _ := newTestAuthService()
+
+	_, err := svc.Login(context.Background(), "test@example.com", "pass", "agent", "127.0.0.1")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "database connection not found")
+}
+
+// 2. Пользователь не найден
+func TestLogin_UserNotFound(t *testing.T) {
+	svc, mockUserRepo, _, _ := newTestAuthService()
+	ctx := context.WithValue(context.Background(), "db", &config.Database{})
+
+	mockUserRepo.On("FindByEmail", ctx, mock.Anything, "test@example.com").
+		Return(nil, errors.New("not found"))
+
+	_, err := svc.Login(ctx, "test@example.com", "pass", "agent", "127.0.0.1")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "пользователь не найден")
+	mockUserRepo.AssertExpectations(t)
+}
+
+// 3. Неверный пароль
+func TestLogin_WrongPassword(t *testing.T) {
+	svc, mockUserRepo, _, _ := newTestAuthService()
+	ctx := context.WithValue(context.Background(), "db", &config.Database{})
+
+	// создаем юзера с хэшем от "goodpass"
+	hash, _ := security.HashPassword("goodpass")
+	user := &model.User{UUID: "u1", PasswordHash: hash}
+
+	mockUserRepo.On("FindByEmail", ctx, mock.Anything, "test@example.com").
+		Return(user, nil)
+
+	_, err := svc.Login(ctx, "test@example.com", "badpass", "agent", "127.0.0.1")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "неверный логин или пароль")
+	mockUserRepo.AssertExpectations(t)
+}
+
+// 4. Ошибка генерации токенов
+func TestLogin_GenerateTokensError(t *testing.T) {
+	svc, mockUserRepo, mockJWTService, _ := newTestAuthService()
+	ctx := context.WithValue(context.Background(), "db", &config.Database{})
+
+	hash, _ := security.HashPassword("goodpass")
+	user := &model.User{UUID: "u1", PasswordHash: hash}
+
+	mockUserRepo.On("FindByEmail", ctx, mock.Anything, "test@example.com").
+		Return(user, nil)
+	mockJWTService.On("GenerateAccessRefreshTokens", "u1").
+		Return(nil, nil, errors.New("token error"))
+
+	_, err := svc.Login(ctx, "test@example.com", "goodpass", "agent", "127.0.0.1")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ошибка генерации токенов")
+	mockUserRepo.AssertExpectations(t)
+	mockJWTService.AssertExpectations(t)
+}
+
+// 5. Ошибка сохранения refresh токена
+func TestLogin_SaveRefreshTokenError(t *testing.T) {
+	svc, mockUserRepo, mockJWTService, mockJWTRepo := newTestAuthService()
+	ctx := context.WithValue(context.Background(), "db", &config.Database{})
+
+	hash, _ := security.HashPassword("goodpass")
+	user := &model.User{UUID: "u1", PasswordHash: hash}
+	tokens := &model.TokensPair{AccessToken: "acc", RefreshToken: "ref"}
+	refresh := &model.RefreshToken{
+		UUID:      "r1",
+		UserUUID:  "u1",
+		TokenHash: "ref",
+		ExpireAt:  time.Now().Add(24 * time.Hour),
 	}
 
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).
-		Return(nil, fmt.Errorf("invalid token"))
+	mockUserRepo.On("FindByEmail", ctx, mock.Anything, "test@example.com").
+		Return(user, nil)
+	mockJWTService.On("GenerateAccessRefreshTokens", "u1").
+		Return(tokens, refresh, nil)
+	mockJWTRepo.On("SaveRefreshToken", ctx, refresh, "127.0.0.1").
+		Return(errors.New("db error"))
 
-	_, err := authService.RefreshToken(ctx, "agent", "1.2.3.4", "bad-access-token", "refresh-token")
+	_, err := svc.Login(ctx, "test@example.com", "goodpass", "agent", "127.0.0.1")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ошибка сохранения refresh токена")
+	mockUserRepo.AssertExpectations(t)
+	mockJWTService.AssertExpectations(t)
+	mockJWTRepo.AssertExpectations(t)
+}
+
+// 6. Успешный логин
+func TestLogin_Success(t *testing.T) {
+	svc, mockUserRepo, mockJWTService, mockJWTRepo := newTestAuthService()
+	ctx := context.WithValue(context.Background(), "db", &config.Database{})
+
+	hash, _ := security.HashPassword("goodpass")
+	user := &model.User{UUID: "u1", PasswordHash: hash}
+	tokens := &model.TokensPair{AccessToken: "acc", RefreshToken: "ref"}
+	refresh := &model.RefreshToken{
+		UUID:      "r1",
+		UserUUID:  "u1",
+		TokenHash: "ref",
+		ExpireAt:  time.Now().Add(24 * time.Hour),
+	}
+
+	mockUserRepo.On("FindByEmail", ctx, mock.Anything, "test@example.com").
+		Return(user, nil)
+	mockJWTService.On("GenerateAccessRefreshTokens", "u1").
+		Return(tokens, refresh, nil)
+	mockJWTRepo.On("SaveRefreshToken", ctx, refresh, "127.0.0.1").
+		Return(nil)
+
+	result, err := svc.Login(ctx, "test@example.com", "goodpass", "agent", "127.0.0.1")
+
+	assert.NoError(t, err)
+	assert.Equal(t, tokens, result)
+	assert.Equal(t, "agent", refresh.UserAgent)
+	assert.Equal(t, "127.0.0.1", refresh.IpAddress)
+
+	mockUserRepo.AssertExpectations(t)
+	mockJWTService.AssertExpectations(t)
+	mockJWTRepo.AssertExpectations(t)
+}
+
+func newTestRefreshService() (*service.AuthenticationService, *MockJWTService, *MockJWTRepo) {
+	mockJWTService := new(MockJWTService)
+	mockJWTRepo := new(MockJWTRepo)
+
+	svc := service.NewAuthenticationService(
+		mockJWTRepo, // JWTRepositoryInterface
+		&config.AppConfig{ // AppConfig, можно заполнить SecretKey
+			JWT: config.JWTConfig{
+				SecretKey: "secret",
+			},
+		},
+		mockJWTService, // JWTServiceInterface
+		nil,            // UserRepository не нужен для RefreshToken
+	)
+
+	return svc, mockJWTService, mockJWTRepo
+}
+
+func TestRefreshToken_ValidateJWTError(t *testing.T) {
+	svc, mockJWTService, _ := newTestRefreshService()
+
+	ctx := context.Background()
+
+	mockJWTService.On("ValidateJWT", "badtoken", mock.Anything).Return(nil, errors.New("invalid"))
+
+	tokens, err := svc.RefreshToken(ctx, "agent", "127.0.0.1", "badtoken", "refresh")
+
+	assert.Nil(t, tokens)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "не удалось провалидировать токен")
+	mockJWTService.AssertExpectations(t)
 }
 
-// 2
 func TestRefreshToken_RefreshTokenNotFound(t *testing.T) {
+	svc, mockJWTService, mockJWTRepo := newTestRefreshService()
+
 	ctx := context.Background()
-	mockRepo := new(MockJWTRepository)
-	mockJWTService := new(MockJWTService)
+	claims := &security.Claims{UserUUID: "u1", RefreshTokenUUID: "r1"}
 
-	authService := &AuthenticationService{
-		JWTRepository: mockRepo,
-		JWTService:    mockJWTService,
-		Config:        testConfig(),
-	}
+	mockJWTService.On("ValidateJWT", "token", mock.Anything).Return(claims, nil)
+	mockJWTRepo.On("FindByUUID", ctx, "r1").Return(nil, errors.New("not found"))
 
-	refreshUUID := "refresh-uuid"
+	tokens, err := svc.RefreshToken(ctx, "agent", "127.0.0.1", "token", "refresh")
 
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).
-		Return(&security.Claims{RefreshTokenUUID: refreshUUID, UserUUID: "user-uuid"}, nil)
-
-	mockRepo.On("FindByUUID", ctx, refreshUUID).
-		Return(nil, fmt.Errorf("not found"))
-
-	_, err := authService.RefreshToken(ctx, "agent", "1.2.3.4", "access-token", "refresh-token")
+	assert.Nil(t, tokens)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "не удалось найти рефреш токен")
+	mockJWTService.AssertExpectations(t)
+	mockJWTRepo.AssertExpectations(t)
 }
 
-// 3
-func TestRefreshToken_RefreshTokenUsed(t *testing.T) {
+func TestRefreshToken_UsedToken(t *testing.T) {
+	svc, mockJWTService, mockJWTRepo := newTestRefreshService()
+
 	ctx := context.Background()
-	mockRepo := new(MockJWTRepository)
-	mockJWTService := new(MockJWTService)
+	claims := &security.Claims{UserUUID: "u1", RefreshTokenUUID: "r1"}
+	rt := &model.RefreshToken{Used: true}
 
-	authService := &AuthenticationService{
-		JWTRepository: mockRepo,
-		JWTService:    mockJWTService,
-		Config:        testConfig(),
-	}
+	mockJWTService.On("ValidateJWT", "token", mock.Anything).Return(claims, nil)
+	mockJWTRepo.On("FindByUUID", ctx, "r1").Return(rt, nil)
 
-	refreshUUID := "refresh-uuid"
+	tokens, err := svc.RefreshToken(ctx, "agent", "127.0.0.1", "token", "refresh")
 
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).
-		Return(&security.Claims{RefreshTokenUUID: refreshUUID, UserUUID: "user-uuid"}, nil)
-
-	storedToken := &model.RefreshToken{
-		UUID: refreshUUID,
-		Used: true,
-	}
-
-	mockRepo.On("FindByUUID", ctx, refreshUUID).Return(storedToken, nil)
-
-	_, err := authService.RefreshToken(ctx, "agent", "1.2.3.4", "access-token", "refresh-token")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "токен уже был использован")
-}
-
-// 4
-func TestRefreshToken_RefreshTokenExpired(t *testing.T) {
-	ctx := context.Background()
-	mockRepo := new(MockJWTRepository)
-	mockJWTService := new(MockJWTService)
-
-	authService := &AuthenticationService{
-		JWTRepository: mockRepo,
-		JWTService:    mockJWTService,
-		Config:        testConfig(),
-	}
-
-	refreshUUID := "refresh-uuid"
-
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).
-		Return(&security.Claims{RefreshTokenUUID: refreshUUID, UserUUID: "user-uuid"}, nil)
-
-	storedToken := &model.RefreshToken{
-		UUID:     refreshUUID,
-		Used:     false,
-		ExpireAt: time.Now().Add(-time.Hour), // уже истёк
-	}
-
-	mockRepo.On("FindByUUID", ctx, refreshUUID).Return(storedToken, nil)
-
-	_, err := authService.RefreshToken(ctx, "agent", "1.2.3.4", "access-token", "refresh-token")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "токен просрочен")
-}
-
-// 5
-func TestRefreshToken_UserAgentMismatch(t *testing.T) {
-	ctx := context.Background()
-	mockRepo := new(MockJWTRepository)
-	mockJWTService := new(MockJWTService)
-
-	authService := &AuthenticationService{
-		JWTRepository: mockRepo,
-		JWTService:    mockJWTService,
-		Config:        testConfig(),
-	}
-
-	refreshUUID := "refresh-uuid"
-	userAgent := "agent"
-
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).
-		Return(&security.Claims{RefreshTokenUUID: refreshUUID, UserUUID: "user-uuid"}, nil)
-
-	storedToken := &model.RefreshToken{
-		UUID:      refreshUUID,
-		Used:      false,
-		ExpireAt:  time.Now().Add(time.Hour),
-		UserAgent: "other-agent",
-	}
-
-	mockRepo.On("FindByUUID", ctx, refreshUUID).Return(storedToken, nil)
-	mockRepo.On("MarkRefreshTokenUsedByUUID", ctx, refreshUUID).Return(nil)
-
-	_, err := authService.RefreshToken(ctx, userAgent, "1.2.3.4", "access-token", "refresh-token")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "обновление токена запрещено. User-Agent был изменен")
-}
-
-// 6
-func TestRefreshToken_BcryptCompareFails(t *testing.T) {
-	ctx := context.Background()
-	mockRepo := new(MockJWTRepository)
-	mockJWTService := new(MockJWTService)
-
-	authService := &AuthenticationService{
-		JWTRepository: mockRepo,
-		JWTService:    mockJWTService,
-		Config:        testConfig(),
-	}
-
-	refreshUUID := "refresh-uuid"
-	userUUID := "user-uuid"
-	userAgent := "agent"
-	ip := "1.2.3.4"
-
-	hashedBytes, _ := bcrypt.GenerateFromPassword([]byte("correct-refresh-token"), bcrypt.DefaultCost)
-	hashedRefresh := string(hashedBytes)
-
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).Return(&security.Claims{
-		UserUUID:         userUUID,
-		RefreshTokenUUID: refreshUUID,
-	}, nil)
-
-	storedToken := &model.RefreshToken{
-		UUID:      refreshUUID,
-		UserUUID:  userUUID,
-		TokenHash: hashedRefresh,
-		Used:      false,
-		ExpireAt:  time.Now().Add(10 * time.Minute),
-		UserAgent: userAgent,
-		IpAddress: ip,
-	}
-
-	mockRepo.On("FindByUUID", ctx, refreshUUID).Return(storedToken, nil)
-
-	// передаем специально неправильный refresh token, чтобы bcrypt не прошел
-	_, err := authService.RefreshToken(ctx, userAgent, ip, "access-token", "wrong-refresh-token")
+	assert.Nil(t, tokens)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "невалидный токен")
 }
 
-// 7
-func TestRefreshToken_MarkUsedFails(t *testing.T) {
+func TestRefreshToken_ExpiredToken(t *testing.T) {
+	svc, mockJWTService, mockJWTRepo := newTestRefreshService()
+
 	ctx := context.Background()
-	mockRepo := new(MockJWTRepository)
-	mockJWTService := new(MockJWTService)
+	claims := &security.Claims{UserUUID: "u1", RefreshTokenUUID: "r1"}
+	rt := &model.RefreshToken{Used: false, ExpireAt: time.Now().Add(-time.Hour)}
 
-	authService := &AuthenticationService{
-		JWTRepository: mockRepo,
-		JWTService:    mockJWTService,
-		Config:        testConfig(),
-	}
+	mockJWTService.On("ValidateJWT", "token", mock.Anything).Return(claims, nil)
+	mockJWTRepo.On("FindByUUID", ctx, "r1").Return(rt, nil)
 
-	refreshUUID := "refresh-uuid"
-	userUUID := "user-uuid"
-	userAgent := "agent"
-	ip := "1.2.3.4"
+	tokens, err := svc.RefreshToken(ctx, "agent", "127.0.0.1", "token", "refresh")
 
-	hashedBytes, _ := bcrypt.GenerateFromPassword([]byte("plain-refresh"), bcrypt.DefaultCost)
-	hashedRefresh := string(hashedBytes)
-
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).Return(&security.Claims{
-		UserUUID:         userUUID,
-		RefreshTokenUUID: refreshUUID,
-	}, nil)
-
-	storedToken := &model.RefreshToken{
-		UUID:      refreshUUID,
-		UserUUID:  userUUID,
-		TokenHash: hashedRefresh,
-		Used:      false,
-		ExpireAt:  time.Now().Add(10 * time.Minute),
-		UserAgent: userAgent,
-		IpAddress: ip,
-	}
-
-	mockRepo.On("FindByUUID", ctx, refreshUUID).Return(storedToken, nil)
-	mockRepo.On("MarkRefreshTokenUsedByUUID", ctx, refreshUUID).Return(fmt.Errorf("db error"))
-
-	_, err := authService.RefreshToken(ctx, userAgent, ip, "access-token", "plain-refresh")
+	assert.Nil(t, tokens)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "не удалось использовать токен")
+	assert.Contains(t, err.Error(), "невалидный токен")
 }
 
-// 8
-func TestRefreshToken_GenerateTokensFails(t *testing.T) {
+func TestRefreshToken_UserAgentMismatch(t *testing.T) {
+	svc, mockJWTService, mockJWTRepo := newTestRefreshService()
+
 	ctx := context.Background()
-	mockRepo := new(MockJWTRepository)
-	mockJWTService := new(MockJWTService)
+	claims := &security.Claims{UserUUID: "u1", RefreshTokenUUID: "r1"}
+	rt := &model.RefreshToken{Used: false, ExpireAt: time.Now().Add(time.Hour), UserAgent: "old-agent"}
 
-	authService := &AuthenticationService{
-		JWTRepository: mockRepo,
-		JWTService:    mockJWTService,
-		Config:        testConfig(),
-	}
+	mockJWTService.On("ValidateJWT", "token", mock.Anything).Return(claims, nil)
+	mockJWTRepo.On("FindByUUID", ctx, "r1").Return(rt, nil)
+	mockJWTRepo.On("MarkRefreshTokenUsedByUUID", ctx, "r1").Return(nil)
 
-	refreshUUID := "refresh-uuid"
-	userUUID := "user-uuid"
-	userAgent := "agent"
-	ip := "1.2.3.4"
+	tokens, err := svc.RefreshToken(ctx, "new-agent", "127.0.0.1", "token", "refresh")
 
-	hashedBytes, _ := bcrypt.GenerateFromPassword([]byte("plain-refresh"), bcrypt.DefaultCost)
-	hashedRefresh := string(hashedBytes)
-
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).Return(&security.Claims{
-		UserUUID:         userUUID,
-		RefreshTokenUUID: refreshUUID,
-	}, nil)
-
-	storedToken := &model.RefreshToken{
-		UUID:      refreshUUID,
-		UserUUID:  userUUID,
-		TokenHash: hashedRefresh,
-		Used:      false,
-		ExpireAt:  time.Now().Add(10 * time.Minute),
-		UserAgent: userAgent,
-		IpAddress: ip,
-	}
-
-	mockRepo.On("FindByUUID", ctx, refreshUUID).Return(storedToken, nil)
-	mockRepo.On("MarkRefreshTokenUsedByUUID", ctx, refreshUUID).Return(nil)
-
-	mockJWTService.On("GenerateAccessRefreshTokens", userUUID).
-		Return((*model.TokensPair)(nil), (*model.RefreshToken)(nil), fmt.Errorf("jwt generation error"))
-
-	_, err := authService.RefreshToken(ctx, userAgent, ip, "access-token", "plain-refresh")
+	assert.Nil(t, tokens)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "ошибка генерации токенов")
+	assert.Contains(t, err.Error(), "невалидный токен")
+	mockJWTRepo.AssertExpectations(t)
 }
 
-// 9
-func TestRefreshToken_SaveRefreshTokenFails(t *testing.T) {
+func TestRefreshToken_InvalidHash(t *testing.T) {
+	svc, mockJWTService, mockJWTRepo := newTestRefreshService()
+
 	ctx := context.Background()
-	mockRepo := new(MockJWTRepository)
-	mockJWTService := new(MockJWTService)
-
-	authService := &AuthenticationService{
-		JWTRepository: mockRepo,
-		JWTService:    mockJWTService,
-		Config:        testConfig(),
-	}
-
-	refreshUUID := "refresh-uuid"
-	userUUID := "user-uuid"
-	userAgent := "agent"
-	ip := "1.2.3.4"
-
-	hashedBytes, _ := bcrypt.GenerateFromPassword([]byte("plain-refresh"), bcrypt.DefaultCost)
-	hashedRefresh := string(hashedBytes)
-
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).Return(&security.Claims{
-		UserUUID:         userUUID,
-		RefreshTokenUUID: refreshUUID,
-	}, nil)
-
-	storedToken := &model.RefreshToken{
-		UUID:      refreshUUID,
-		UserUUID:  userUUID,
-		TokenHash: hashedRefresh,
+	claims := &security.Claims{UserUUID: "u1", RefreshTokenUUID: "r1"}
+	rt := &model.RefreshToken{
 		Used:      false,
-		ExpireAt:  time.Now().Add(10 * time.Minute),
-		UserAgent: userAgent,
-		IpAddress: ip,
+		ExpireAt:  time.Now().Add(time.Hour),
+		UserAgent: "agent",
+		IpAddress: "127.0.0.1",
+		TokenHash: "$2a$10$invalidhashstring...........", // некорректный bcrypt
 	}
 
-	mockRepo.On("FindByUUID", ctx, refreshUUID).Return(storedToken, nil)
-	mockRepo.On("MarkRefreshTokenUsedByUUID", ctx, refreshUUID).Return(nil)
+	mockJWTService.On("ValidateJWT", "token", mock.Anything).Return(claims, nil)
+	mockJWTRepo.On("FindByUUID", ctx, "r1").Return(rt, nil)
 
-	mockJWTService.On("GenerateAccessRefreshTokens", userUUID).
-		Return(&model.TokensPair{AccessToken: "new-access", RefreshToken: "new-refresh"}, &model.RefreshToken{UUID: "new-refresh-uuid"}, nil)
+	tokens, err := svc.RefreshToken(ctx, "agent", "127.0.0.1", "token", "wrongpass")
 
-	mockRepo.On("SaveRefreshToken", ctx, mock.Anything).
-		Return(fmt.Errorf("database error"))
-
-	_, err := authService.RefreshToken(ctx, userAgent, ip, "access-token", "plain-refresh")
+	assert.Nil(t, tokens)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "не удалось сохранить рефреш токен")
+	assert.Contains(t, err.Error(), "невалидный токен")
 }
 
-// 10
 func TestRefreshToken_Success(t *testing.T) {
+	svc, mockJWTService, mockJWTRepo := newTestRefreshService()
+
 	ctx := context.Background()
-	mockRepo := new(MockJWTRepository)
-	mockJWTService := new(MockJWTService)
+	claims := &security.Claims{UserUUID: "u1", RefreshTokenUUID: "r1"}
 
-	authService := &AuthenticationService{
-		JWTRepository: mockRepo,
-		Config:        testConfig(),
-		JWTService:    mockJWTService,
-	}
-
-	refreshUUID := "refresh-uuid"
-	userUUID := "user-uuid"
-	userAgent := "agent"
-	ip := "1.2.3.4"
-
-	hashedBytes, err := bcrypt.GenerateFromPassword([]byte("plain-refresh"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("failed to generate bcrypt hash: %v", err)
-	}
-	hashedRefresh := string(hashedBytes)
-
-	mockJWTService.On("ValidateJWT", mock.Anything, mock.Anything).Return(&security.Claims{
-		UserUUID:         userUUID,
-		RefreshTokenUUID: refreshUUID,
-	}, nil)
-
-	storedToken := &model.RefreshToken{
-		UUID:      refreshUUID,
-		UserUUID:  userUUID,
-		TokenHash: hashedRefresh,
+	hash, _ := security.HashPassword("refresh123")
+	rt := &model.RefreshToken{
 		Used:      false,
-		ExpireAt:  time.Now().Add(10 * time.Minute),
-		UserAgent: userAgent,
-		IpAddress: ip,
+		ExpireAt:  time.Now().Add(time.Hour),
+		UserAgent: "agent",
+		IpAddress: "127.0.0.1",
+		TokenHash: hash,
 	}
 
-	mockRepo.On("FindByUUID", ctx, refreshUUID).Return(storedToken, nil)
-	mockRepo.On("MarkRefreshTokenUsedByUUID", ctx, refreshUUID).Return(nil)
-	mockRepo.On("SaveRefreshToken", ctx, mock.Anything).Return(nil)
+	tokensPair := &model.TokensPair{AccessToken: "acc", RefreshToken: "ref"}
+	newRefresh := &model.RefreshToken{}
 
-	mockJWTService.On("GenerateAccessRefreshTokens", userUUID).Return(
-		&model.TokensPair{AccessToken: "new-access", RefreshToken: "new-refresh"},
-		&model.RefreshToken{UUID: "new-refresh-uuid"},
-		nil,
-	)
+	mockJWTService.On("ValidateJWT", "token", mock.Anything).Return(claims, nil)
+	mockJWTRepo.On("FindByUUID", ctx, "r1").Return(rt, nil)
+	mockJWTRepo.On("MarkRefreshTokenUsedByUUID", ctx, "r1").Return(nil)
+	mockJWTService.On("GenerateAccessRefreshTokens", "u1").Return(tokensPair, newRefresh, nil)
+	mockJWTRepo.On("SaveRefreshToken", ctx, newRefresh, "127.0.0.1").Return(nil)
 
-	tokens, err := authService.RefreshToken(ctx, userAgent, ip, "access-token", "plain-refresh")
+	result, err := svc.RefreshToken(ctx, "agent", "127.0.0.1", "token", "refresh123")
 
 	assert.NoError(t, err)
-	assert.Equal(t, "new-access", tokens.AccessToken)
-	assert.Equal(t, "new-refresh", tokens.RefreshToken)
+	assert.Equal(t, tokensPair, result)
+	assert.Equal(t, "agent", newRefresh.UserAgent)
+	assert.Equal(t, "127.0.0.1", newRefresh.IpAddress)
 }

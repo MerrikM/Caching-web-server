@@ -17,14 +17,14 @@ import (
 
 type AuthenticationService struct {
 	jwtRepoInterface ports.JWTRepositoryInterface
-	*config.Config
+	*config.AppConfig
 	jwtServiceInterface ports.JWTServiceInterface
 	userRepository      ports.UserRepository
 }
 
 func NewAuthenticationService(
 	repo ports.JWTRepositoryInterface,
-	cfg *config.Config,
+	cfg *config.AppConfig,
 	service ports.JWTServiceInterface,
 	userInterface ports.UserRepository,
 ) *AuthenticationService {
@@ -37,25 +37,30 @@ func NewAuthenticationService(
 }
 
 func (s *AuthenticationService) Login(ctx context.Context, email, password, userAgent, ipAddress string) (*model.TokensPair, error) {
-	user, err := s.userRepository.FindByEmail(ctx, email)
-	if err != nil {
-		return nil, fmt.Errorf("пользователь не найден: %w", err)
+	db, ok := ctx.Value("db").(*config.Database)
+	if !ok {
+		return nil, fmt.Errorf("database connection not found in context")
 	}
 
-	if !security.CheckPassword(password, user.PasswordHash) {
-		return nil, fmt.Errorf("неверный пароль")
+	user, err := s.userRepository.FindByEmail(ctx, db, email)
+	if err != nil {
+		return nil, util.LogError("пользователь не найден", err)
+	}
+
+	if security.CheckPassword(password, user.PasswordHash) == false {
+		return nil, fmt.Errorf("[AuthenticationService] неверный логин или пароль")
 	}
 
 	tokens, refreshToken, err := s.jwtServiceInterface.GenerateAccessRefreshTokens(user.UUID)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка генерации токенов: %w", err)
+		return nil, util.LogError("[AuthenticationService] ошибка генерации токенов", err)
 	}
 
 	refreshToken.UserAgent = userAgent
 	refreshToken.IpAddress = ipAddress
 
-	if err := s.jwtRepoInterface.SaveRefreshToken(ctx, refreshToken); err != nil {
-		return nil, fmt.Errorf("ошибка сохранения refresh токена: %w", err)
+	if err := s.jwtRepoInterface.SaveRefreshToken(ctx, refreshToken, ipAddress); err != nil {
+		return nil, util.LogError("[AuthenticationService] ошибка сохранения refresh токена", err)
 	}
 
 	return tokens, nil
@@ -91,7 +96,7 @@ func (s *AuthenticationService) Login(ctx context.Context, email, password, user
 //   - model.TokensPair
 //   - ошибку, если не удалось обновить токен.
 func (s *AuthenticationService) RefreshToken(ctx context.Context, userAgent string, ipAddress string, accessToken string, refreshToken string) (*model.TokensPair, error) {
-	claims, err := s.jwtServiceInterface.ValidateJWT(accessToken, []byte(s.Config.JWT.SecretKey))
+	claims, err := s.jwtServiceInterface.ValidateJWT(accessToken, []byte(s.AppConfig.JWT.SecretKey))
 	if err != nil {
 		return nil, util.LogError("не удалось провалидировать токен", err)
 	}
@@ -124,7 +129,7 @@ func (s *AuthenticationService) RefreshToken(ctx context.Context, userAgent stri
 	if storedRefreshToken.IpAddress != ipAddress {
 		log.Printf("обнаружен вход с нового ip адреса, отправка webhook")
 		go func() {
-			if err := notifier.NotifyWebhook(s.Config.Webhook.URL, userUUID, ipAddress, storedRefreshToken.IpAddress); err != nil {
+			if err := notifier.NotifyWebhook(s.AppConfig.Webhook.URL, userUUID, ipAddress, storedRefreshToken.IpAddress); err != nil {
 				log.Printf("ошибка отправки webhook: %v", err)
 			}
 		}()
@@ -146,7 +151,7 @@ func (s *AuthenticationService) RefreshToken(ctx context.Context, userAgent stri
 
 	newRefreshToken.UserAgent = userAgent
 	newRefreshToken.IpAddress = ipAddress
-	err = s.jwtRepoInterface.SaveRefreshToken(ctx, newRefreshToken)
+	err = s.jwtRepoInterface.SaveRefreshToken(ctx, newRefreshToken, ipAddress)
 	if err != nil {
 		return nil, util.LogError("не удалось сохранить рефреш токен", err)
 	}
