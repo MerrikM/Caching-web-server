@@ -33,17 +33,17 @@ func NewAuthenticationHandler(
 
 // Login godoc
 // @Summary Аутентификация пользователя
-// @Description Получение токена по логину и паролю
+// @Description Получение access токена по логину и паролю
 // @Tags Authentication
 // @Accept json
 // @Produce json
-// @Param body body requestresponse.LoginRequest true "Тело запроса"
-// @Success 200 {object} requestresponse.ResponseMessage "Доступ успешно удалён"
-// @Failure 400 {object} requestresponse.ErrorResponse "Некорректный запрос"
-// @Failure 401 {object} requestresponse.ErrorResponse "Пользователь не авторизован"
-// @Failure 403 {object} requestresponse.ErrorResponse "Доступ запрещён"
-// @Failure 404 {object} requestresponse.ErrorResponse "Документ не найден"
-// @Failure 500 {object} requestresponse.ErrorResponse "Внутренняя ошибка сервера"
+// @Param body body requestresponse.LoginRequest true "Тело запроса" example({"login": "user1", "password": "StrongPass123!"})
+// @Success 200 {object} requestresponse.LoginResponse "Успешная аутентификация" example({"response": {"token": "access_token_here"}})
+// @Failure 400 {object} requestresponse.ErrorResponse "Некорректный JSON или пустые поля" example({"error": "login и password обязательны"})
+// @Failure 401 {object} requestresponse.ErrorResponse "Пользователь не авторизован" example({"error": "не удалось авторизовать пользователя"})
+// @Failure 403 {object} requestresponse.ErrorResponse "Доступ запрещён" example({"error": "Доступ запрещён"})
+// @Failure 404 {object} requestresponse.ErrorResponse "пользователь не найден" example({"error": "пользователь не найден"})
+// @Failure 500 {object} requestresponse.ErrorResponse "Внутренняя ошибка сервера" example({"error": "внутренняя ошибка сервера"})
 // @Router /api/auth [post]
 func (h *AuthenticationHandler) Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -65,9 +65,9 @@ func (h *AuthenticationHandler) Login(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		switch {
 		case strings.Contains(err.Error(), "доступ запрещён"):
-			util.HandleError(w, "Доступ запрещён", http.StatusForbidden)
+			util.HandleError(w, "доступ запрещён", http.StatusForbidden)
 		case strings.Contains(err.Error(), "не найден"):
-			util.HandleError(w, "Документ не найден", http.StatusNotFound)
+			util.HandleError(w, "пользователь не найден", http.StatusNotFound)
 		default:
 			util.HandleError(w, "внутренняя ошибка сервера", http.StatusInternalServerError)
 		}
@@ -141,10 +141,10 @@ func (h *AuthenticationHandler) GetCurrentUsersUUIDHead(w http.ResponseWriter, r
 // @Produce json
 // @Param body body requestresponse.RefreshTokenRequest true "Тело запроса"
 // @Param Authorization header string true "Bearer токен" default(Bearer <access_token>)
-// @Success 200 {object} requestresponse.RefreshTokenResponse
-// @Failure 400 {object} requestresponse.ErrorResponse
-// @Failure 401 {object} requestresponse.ErrorResponse
-// @Failure 500 {object} requestresponse.ErrorResponse
+// @Success 200 {object} requestresponse.RefreshTokenResponse "Новые access и refresh токены" example({"response": {"access_token": "new_access_token_here", "refresh_token": "new_refresh_token_here"}})
+// @Failure 400 {object} requestresponse.ErrorResponse "Неверный JSON" example({"error": "неверный JSON"})
+// @Failure 401 {object} requestresponse.ErrorResponse "Не авторизован или невалидный токен" example({"error": "не удалось обновить токены"})
+// @Failure 500 {object} requestresponse.ErrorResponse "Внутренняя ошибка сервера" example({"error": "внутренняя ошибка сервера"})
 // @Router /api/auth/refresh [post]
 func (h *AuthenticationHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

@@ -20,8 +20,8 @@ type RegisterData struct {
 
 // ErrorDetail : детальная информация об ошибке
 type ErrorDetail struct {
-	Code int    `json:"code" example:"400"`
-	Text string `json:"text" example:"for example: invalid login or password"`
+	Code int    `json:"code" example:"999"`
+	Text string `json:"text" example:"some error text"`
 }
 
 // ErrorResponse : стандартная структура ошибки

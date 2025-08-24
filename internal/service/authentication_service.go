@@ -44,7 +44,7 @@ func (s *AuthenticationService) Login(ctx context.Context, email, password, user
 
 	user, err := s.userRepository.FindByEmail(ctx, db, email)
 	if err != nil {
-		return nil, util.LogError("пользователь не найден", err)
+		return nil, util.LogError("[AuthenticationService] пользователь не найден", err)
 	}
 
 	if security.CheckPassword(password, user.PasswordHash) == false {

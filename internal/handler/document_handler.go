@@ -674,20 +674,20 @@ func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(response)
 }
 
-// ListDocuments возвращает список документов пользователя
+// ListDocuments godoc
 // @Summary Список документов
-// @Description Возвращает список документов с фильтрацией и пагинацией
+// @Description Возвращает список документов с фильтрацией и пагинацией. Если параметр `login` пустой — возвращаются свои документы.
 // @Tags Documents
 // @Produce json
-// @Param login query string false "Login пользователя для просмотра чужих документов"
-// @Param key query string false "Имя колонки для фильтрации"
-// @Param value query string false "Значение фильтра"
-// @Param limit query int false "Лимит документов на странице" default(20) minimum(1) maximum(100)
-// @Param Authorization header string true "Bearer токен" default(Bearer <access_token>)
-// @Success 200 {object} requestresponse.ListDocumentsResponse
-// @Failure 400 {object} requestresponse.ErrorResponse
-// @Failure 401 {object} requestresponse.ErrorResponse
-// @Failure 500 {object} requestresponse.ErrorResponse
+// @Param login query string false "Логин пользователя, чьи документы хотите посмотреть. Если пусто — свои документы." example("john_doe")
+// @Param key query string false "Ключ для фильтрации документов. Доступные значения: name, mime, public, created." example("name")
+// @Param value query string false "Значение для фильтрации, соответствующее ключу." example("report")
+// @Param limit query int false "Максимальное количество документов на странице. Минимум 1, максимум 100." default(20) minimum(1) maximum(100) example(20)
+// @Param Authorization header string true "Bearer токен пользователя." example("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+// @Success 200 {object} requestresponse.ListDocumentsResponse "Список документов"
+// @Failure 400 {object} requestresponse.ErrorResponse "Неверные параметры запроса"
+// @Failure 401 {object} requestresponse.ErrorResponse "Пользователь не авторизован"
+// @Failure 500 {object} requestresponse.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /api/docs [get]
 // @Security BearerAuth
 func (h *DocumentHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
@@ -751,21 +751,21 @@ func (h *DocumentHandler) ListDocuments(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(resp)
 }
 
-// ListDocumentsHead возвращает заголовки списка документов (HEAD)
-// @Summary Заголовки списка документов
-// @Description Возвращает заголовки списка документов без тела (для HEAD запроса)
+// ListDocumentsHead godoc
+// @Summary Список документов
+// @Description Возвращает список документов с фильтрацией и пагинацией. Если параметр `login` пустой — возвращаются свои документы.
 // @Tags Documents
 // @Produce json
-// @Param login query string false "Login пользователя для просмотра чужих документов"
-// @Param key query string false "Имя колонки для фильтрации"
-// @Param value query string false "Значение фильтра"
-// @Param limit query int false "Лимит документов на странице" default(20) minimum(1) maximum(100)
-// @Param Authorization header string true "Bearer токен" default(Bearer <access_token>)
-// @Success 200 "Заголовки с информацией о документах"
-// @Failure 400 {object} requestresponse.ErrorResponse
-// @Failure 401 {object} requestresponse.ErrorResponse
-// @Failure 500 {object} requestresponse.ErrorResponse
-// @Router /api/docs [head]
+// @Param login query string false "Логин пользователя, чьи документы хотите посмотреть. Если пусто — свои документы." example("john_doe")
+// @Param key query string false "Ключ для фильтрации документов. Доступные значения: name, mime, public, created." example("name")
+// @Param value query string false "Значение для фильтрации, соответствующее ключу." example("report")
+// @Param limit query int false "Максимальное количество документов на странице. Минимум 1, максимум 100." default(20) minimum(1) maximum(100) example(20)
+// @Param Authorization header string true "Bearer токен пользователя." example("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+// @Success 200 {object} requestresponse.ListDocumentsResponse "Список документов"
+// @Failure 400 {object} requestresponse.ErrorResponse "Неверные параметры запроса"
+// @Failure 401 {object} requestresponse.ErrorResponse "Пользователь не авторизован"
+// @Failure 500 {object} requestresponse.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /api/docs [get]
 // @Security BearerAuth
 func (h *DocumentHandler) ListDocumentsHead(w http.ResponseWriter, r *http.Request) {
 	h.ListDocuments(w, r)

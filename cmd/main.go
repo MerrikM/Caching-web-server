@@ -105,20 +105,24 @@ func setupAuthRoutes(r chi.Router, h *handler.AuthenticationHandler, jwtService 
 }
 
 func setupUserRoutes(r chi.Router, h *handler.UserHandler, jwtService *security.JWTService, jwtRepo *repository.JWTRepository, cfg *config.AppConfig) {
-	r.Route("/api/users", func(r chi.Router) {
+	r.Route("/api", func(r chi.Router) {
+		r.Post("/register", h.RegisterUser)
+
 		r.Group(func(r chi.Router) {
 			r.Use(security.JWTMiddleware([]byte(cfg.JWT.SecretKey), jwtRepo, jwtService, cfg.Admin.AdminToken))
-			r.Get("/{uuid}", h.GetUser)
-			r.Head("/{uuid}", h.GetUserHead)
-			r.Put("/{uuid}", h.UpdateUser)
-			r.Put("/{uuid}/password", h.UpdatePassword)
-			r.Delete("/delete", h.DeleteUser)
+
+			r.Get("/users", h.ListUsers)
+			r.Head("/users", h.ListUsers)
+
+			r.Route("/users/{uuid}", func(r chi.Router) {
+				r.Get("/", h.GetUser)
+				r.Head("/", h.GetUserHead)
+				r.Put("/", h.UpdateUser)
+				r.Put("/password", h.UpdatePassword)
+			})
+
+			r.Delete("/users/delete", h.DeleteUser)
 		})
-	})
-	r.Route("/api/", func(r chi.Router) {
-		r.Post("/register", h.RegisterUser)
-		r.Get("/users", h.ListUsers)
-		r.Head("/users", h.ListUsersHead)
 	})
 }
 
@@ -133,7 +137,7 @@ func setupDocumentRoutes(r chi.Router, h *handler.DocumentHandler, jwtService *s
 			r.Get("/", h.GetDocument)
 			r.Head("/", h.GetDocumentHead)
 			r.Post("/share", h.ShareDocument)
-			r.Post("/remove", h.RemoveGrantFromDocument)
+			r.Post("/remove-grant", h.RemoveGrantFromDocument)
 			r.Delete("/", h.DeleteDocument)
 		})
 	})
@@ -147,6 +151,124 @@ func setupDocumentRoutes(r chi.Router, h *handler.DocumentHandler, jwtService *s
 
 	r.Get("/api/docs/public/{token}", h.GetDocumentByToken)
 }
+
+//func main() {
+//	ctx, cancel := context.WithCancel(context.Background())
+//	defer cancel()
+//
+//	cfg, err := config.LoadConfig("config.yaml")
+//	if err != nil {
+//		log.Fatalf("ошибка загрузки конфигурации: %v", err)
+//	}
+//
+//	database, err := config.SetupDatabase(cfg.DatabaseConfig.DSN)
+//	if err != nil {
+//		log.Fatalf("не удалось подключиться к БД: %v", err)
+//	}
+//	defer func() {
+//		if err := database.Close(); err != nil {
+//			log.Printf("ошибка при закрытии БД: %v", err)
+//		}
+//	}()
+//
+//	srv, router := config.SetupServer(cfg.ServerAddr)
+//
+//	redisClient, err := config.SetupRedis(&cfg.RedisConfig)
+//	if err != nil {
+//		log.Fatalf("ошибка подключения к Redis: %v", err)
+//	}
+//	defer func() {
+//		if err := redisClient.Close(); err != nil {
+//			log.Printf("ошибка при закрытии Redis: %v", err)
+//		}
+//	}()
+//
+//	docRepository := repository.NewDocumentRepository(database)
+//	shareRepository := repository.NewGrantDocumentRepository(database)
+//	userRepository := repository.NewUserRepository(database)
+//	jwtRepository := repository.NewJWTRepository(database)
+//	cacheRepository := repository.NewCacheRepository(redisClient, time.Duration(cfg.TTL.S3AndRedis)*time.Second)
+//
+//	s3Service, err := service.NewS3Service(context.Background(), &cfg.S3Config)
+//	if err != nil {
+//		log.Fatalf("Failed to create S3 service: %v", err)
+//	}
+//
+//	docService := service.NewDocumentService(docRepository, cacheRepository, shareRepository, s3Service, userRepository, time.Duration(cfg.TTL.S3AndRedis)*time.Second)
+//	_ = s3Service
+//	_ = docService
+//	_ = shareRepository
+//	// JWT сервис и пользовательский сервис
+//	jwtService := security.NewJWTService(&cfg.JWT) // пример, создаем реализацию JWTServiceInterface
+//	userService := service.NewUserService(userRepository, jwtService, jwtRepository, &cfg.Admin)
+//
+//	// Authentication service
+//	authService := service.NewAuthenticationService(jwtRepository, cfg, jwtService, userRepository)
+//
+//	authenticationHandler := handler.NewAuthenticationHandler(authService, jwtService, jwtRepository)
+//	documentHandler := handler.NewDocumentHandler(docService, &cfg.TTL)
+//
+//	userHandler := handler.NewUserHandler(userService)
+//	router.Use(config.DBMiddleware(database))
+//
+//	router.Get("/swagger/*", httpSwagger.WrapHandler)
+//
+//	router.Route("/api/auth", func(r chi.Router) {
+//		r.Group(func(r chi.Router) {
+//			r.Use(security.JWTMiddleware([]byte(cfg.JWT.SecretKey), jwtRepository, jwtService, cfg.Admin.AdminToken))
+//			r.Get("/me", authenticationHandler.GetCurrentUsersUUID)
+//			r.Head("/me", authenticationHandler.GetCurrentUsersUUIDHead)
+//			r.Post("/refresh", authenticationHandler.RefreshToken)
+//			r.Delete("/{token}", authenticationHandler.Logout)
+//		})
+//		r.Group(func(r chi.Router) {
+//			r.Post("/", authenticationHandler.Login)
+//		})
+//	})
+//
+//	router.Route("/api/users", func(r chi.Router) {
+//		r.Group(func(r chi.Router) {
+//			r.Use(security.JWTMiddleware([]byte(cfg.JWT.SecretKey), jwtRepository, jwtService, cfg.Admin.AdminToken))
+//			r.Get("/{uuid}", userHandler.GetUser)
+//			r.Head("/{uuid}", userHandler.GetUserHead)
+//			r.Put("/{uuid}", userHandler.UpdateUser)
+//			r.Put("/{uuid}/password", userHandler.UpdatePassword)
+//			r.Delete("/delete", userHandler.DeleteUser)
+//		})
+//	})
+//
+//	router.Route("/api/docs", func(r chi.Router) {
+//		r.Use(security.JWTMiddleware([]byte(cfg.JWT.SecretKey), jwtRepository, jwtService, cfg.Admin.AdminToken))
+//		r.Get("/", documentHandler.ListDocuments)
+//		r.Head("/", documentHandler.ListDocumentsHead)
+//		r.Post("/", documentHandler.CreateDocument)
+//
+//		r.Route("/{doc_id}", func(r chi.Router) {
+//			r.Get("/", documentHandler.GetDocument)
+//			r.Head("/", documentHandler.GetDocumentHead)
+//			r.Post("/share", documentHandler.ShareDocument)
+//			r.Post("/remove", documentHandler.RemoveGrantFromDocument)
+//			r.Delete("/", documentHandler.DeleteDocument)
+//		})
+//	})
+//
+//	router.Route("/public/docs", func(r chi.Router) {
+//		r.Get("/{doc_id}", documentHandler.GetPublicDocumentByUUID)
+//		r.Head("/{doc_id}", documentHandler.GetPublicDocumentByUUIDHead)
+//		r.Get("/token/{token}", documentHandler.GetPublicDocumentByToken)
+//		r.Head("/token/{token}", documentHandler.GetPublicDocumentByTokenHead)
+//	})
+//
+//	router.Get("/api/docs/public/{token}", documentHandler.GetDocumentByToken)
+//
+//	router.Route("/api/", func(r chi.Router) {
+//		r.Post("/register", userHandler.RegisterUser)
+//		r.Get("/users", userHandler.ListUsers)
+//		r.Head("/users", userHandler.ListUsersHead)
+//	})
+//
+//	runServer(ctx, srv)
+//}
 
 func runServer(ctx context.Context, server *http.Server) {
 	serverErrors := make(chan error, 1)
