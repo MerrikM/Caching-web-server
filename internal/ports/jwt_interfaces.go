@@ -15,4 +15,5 @@ type JWTRepositoryInterface interface {
 type JWTServiceInterface interface {
 	GenerateAccessRefreshTokens(userUUID string) (*model.TokensPair, *model.RefreshToken, error)
 	ValidateJWT(tokenString string, secret []byte) (*security.Claims, error)
+	ParseAccessToken(tokenStr string) (*security.Claims, error)
 }

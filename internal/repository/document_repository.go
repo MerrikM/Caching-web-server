@@ -6,9 +6,9 @@ import (
 	"caching-web-server/internal/util"
 	"context"
 	_ "database/sql"
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"strconv"
 	"strings"
 )
 
@@ -138,7 +138,7 @@ func (r *DocumentRepository) GetPublicByToken(ctx context.Context, exec sqlx.Ext
 	return &document, nil
 }
 
-// ListDocuments возвращает список документов пользователя с фильтрацией и сортировкой
+// ListDocuments возвращает список документов с фильтрацией и сортировкой
 func (r *DocumentRepository) ListDocuments(
 	ctx context.Context,
 	exec sqlx.ExtContext,
@@ -150,7 +150,8 @@ func (r *DocumentRepository) ListDocuments(
 ) ([]model.Document, error) {
 
 	var sb strings.Builder
-	args := []interface{}{ownerUUID} // $1 — всегда ownerUUID
+	args := []interface{}{}
+	paramIndex := 1
 
 	sb.WriteString(`
 		SELECT 
@@ -170,40 +171,46 @@ func (r *DocumentRepository) ListDocuments(
 		FROM documents AS d
 		LEFT JOIN users AS u ON u.uuid = d.owner_uuid
 		WHERE d.deleted_at IS NULL
-		  AND d.owner_uuid = $1::uuid
 	`)
 
-	// фильтр по чужому логину
-	if login != "" {
-		sb.WriteString(" AND u.login = $2")
+	// фильтр по ownerUUID или по чужому login
+	if login == "" {
+		// свои документы
+		sb.WriteString(fmt.Sprintf(" AND d.owner_uuid = $%d", paramIndex))
+		args = append(args, ownerUUID)
+		paramIndex++
+	} else {
+		// чужие документы
+		sb.WriteString(fmt.Sprintf(" AND u.login = $%d", paramIndex))
 		args = append(args, login)
+		paramIndex++
 	}
 
 	// динамические фильтры
-	paramIndex := len(args) + 1
 	if filterKey != "" && filterValue != "" {
 		switch filterKey {
 		case "name":
-			sb.WriteString(" AND d.filename_original ILIKE $" + strconv.Itoa(paramIndex))
+			sb.WriteString(fmt.Sprintf(" AND d.filename_original ILIKE $%d", paramIndex))
 			args = append(args, "%"+filterValue+"%")
 		case "mime":
-			sb.WriteString(" AND d.mime_type = $" + strconv.Itoa(paramIndex))
+			sb.WriteString(fmt.Sprintf(" AND d.mime_type = $%d", paramIndex))
 			args = append(args, filterValue)
 		case "public":
-			sb.WriteString(" AND d.is_public = $" + strconv.Itoa(paramIndex))
+			sb.WriteString(fmt.Sprintf(" AND d.is_public = $%d", paramIndex))
 			args = append(args, strings.ToLower(filterValue) == "true")
 		case "created":
-			sb.WriteString(" AND DATE(d.created_at) = $" + strconv.Itoa(paramIndex))
+			sb.WriteString(fmt.Sprintf(" AND DATE(d.created_at) = $%d", paramIndex))
 			args = append(args, filterValue)
 		}
 		paramIndex++
 	}
 
+	// сортировка
 	sb.WriteString(" ORDER BY d.filename_original ASC, d.created_at ASC")
 
 	// лимит
 	if limit > 0 {
-		sb.WriteString(" LIMIT $" + strconv.Itoa(len(args)+1))
+		sb.WriteString(fmt.Sprintf(" LIMIT $%d", paramIndex))
 		args = append(args, limit)
 	}
 
@@ -232,10 +239,18 @@ func (r *DocumentRepository) Delete(ctx context.Context, exec sqlx.ExtContext, d
 	return deletedUUID, nil
 }
 
-func (r *DocumentRepository) BeginTX(ctx context.Context) (sqlx.ExtContext, func() error, error) {
+//func (r *DocumentRepository) BeginTX(ctx context.Context) (sqlx.ExtContext, func() error, error) {
+//	tx, err := r.DB.BeginTxx(ctx, nil)
+//	if err != nil {
+//		return nil, nil, err
+//	}
+//	return tx, func() error { return tx.Rollback() }, nil
+//}
+
+func (r *DocumentRepository) BeginTX(ctx context.Context) (sqlx.ExtContext, func() error, func() error, error) {
 	tx, err := r.DB.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return tx, func() error { return tx.Rollback() }, nil
+	return tx, func() error { return tx.Rollback() }, func() error { return tx.Commit() }, nil
 }

@@ -15,7 +15,7 @@ type DocumentRepository interface {
 	GetPublicByToken(ctx context.Context, exec sqlx.ExtContext, token string) (*model.Document, error)
 	ListDocuments(ctx context.Context, exec sqlx.ExtContext, ownerUUID, login, filterKey, filterValue string, limit int) ([]model.Document, error)
 	Delete(ctx context.Context, exec sqlx.ExtContext, docID string, ownerUUID string) (string, error)
-	BeginTX(ctx context.Context) (sqlx.ExtContext, func() error, error)
+	BeginTX(ctx context.Context) (sqlx.ExtContext, func() error, func() error, error)
 }
 
 type GrantDocumentRepository interface {
