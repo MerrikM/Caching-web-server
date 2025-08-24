@@ -121,7 +121,7 @@ func setupUserRoutes(r chi.Router, h *handler.UserHandler, jwtService *security.
 				r.Put("/password", h.UpdatePassword)
 			})
 
-			r.Delete("/users/delete", h.DeleteUser)
+			r.Delete("/users/{uuid}", h.DeleteUser)
 		})
 	})
 }
