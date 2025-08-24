@@ -4,6 +4,7 @@ import (
 	"caching-web-server/config"
 	"caching-web-server/internal/model"
 	"caching-web-server/internal/repository"
+	"caching-web-server/internal/util"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -18,36 +19,43 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type contextKey string
+
+const (
+	UserContextKey contextKey = "user"
+)
+
 type Claims struct {
 	UserUUID         string `json:"user_uuid"`
 	RefreshTokenUUID string `json:"refresh_token_id"`
+	IsAdmin          bool   `json:"is_admin,omitempty"`
 	jwt.RegisteredClaims
 }
 
 type JWTService struct {
-	*config.Config
+	*config.JWTConfig
 }
 
-func NewJWTService(cfg *config.Config) *JWTService {
+func NewJWTService(cfg *config.JWTConfig) *JWTService {
 	return &JWTService{cfg}
 }
 
 func (service *JWTService) GenerateAccessRefreshTokens(userUUID string) (*model.TokensPair, *model.RefreshToken, error) {
 	refreshToken, refreshTokenStr, err := GenerateRefreshToken()
 	if err != nil {
-		return nil, nil, fmt.Errorf("ошибка генерации рефреш токена: %w", err)
+		return nil, nil, util.LogError("ошибка генерации рефреш токена", err)
 	}
 
 	refreshToken.UserUUID = userUUID
-	timeDuration, err := time.ParseDuration(service.Config.JWT.RefreshTokenTTL)
+	timeDuration, err := time.ParseDuration(service.RefreshTokenTTL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("ошибка парсинга: %w", err)
+		return nil, nil, util.LogError("ошибка парсинга", err)
 	}
 	refreshToken.ExpireAt = time.Now().Add(timeDuration)
 
-	timeDuration, err = time.ParseDuration(service.Config.JWT.AccessTokenTTL)
+	timeDuration, err = time.ParseDuration(service.AccessTokenTTL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("ошибка парсинга: %w", err)
+		return nil, nil, util.LogError("ошибка парсинга", err)
 	}
 	claims := Claims{
 		UserUUID:         userUUID,
@@ -55,14 +63,14 @@ func (service *JWTService) GenerateAccessRefreshTokens(userUUID string) (*model.
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(timeDuration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "MEDODS_TestProject",
+			Issuer:    "Caching-web-server",
 		},
 	}
 
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	accessToken, err := jwtToken.SignedString([]byte(service.Config.JWT.SecretKey))
+	accessToken, err := jwtToken.SignedString([]byte(service.SecretKey))
 	if err != nil {
-		return nil, nil, fmt.Errorf("ошибка подписи токена: %w", err)
+		return nil, nil, util.LogError("ошибка подписи токена", err)
 	}
 
 	return &model.TokensPair{
@@ -75,14 +83,14 @@ func GenerateRefreshToken() (*model.RefreshToken, string, error) {
 	jwtTokenBytes := make([]byte, 32)
 	_, err := rand.Read(jwtTokenBytes)
 	if err != nil {
-		return nil, "", fmt.Errorf("ошибка генерации: %w", err)
+		return nil, "", util.LogError("ошибка генерации", err)
 	}
 	refreshUUID := uuid.New().String()
 	refreshTokenStr := base64.StdEncoding.EncodeToString(jwtTokenBytes)
 
 	hashedToken, err := bcrypt.GenerateFromPassword([]byte(refreshTokenStr), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, "", fmt.Errorf("ошибка хэширования: %w", err)
+		return nil, "", util.LogError("ошибка хэширования", err)
 	}
 
 	// refreshTokenStr отдается клиенту
@@ -105,29 +113,39 @@ func (service *JWTService) ValidateJWT(jwtTokenStr string, secretKey []byte) (*C
 	})
 
 	if err != nil || jwtToken.Valid == false {
-		return nil, fmt.Errorf("невалидный токен: %w", err)
+		return nil, util.LogError("невалидный токен", err)
 	}
 
 	return claims, nil
 }
 
-func JWTMiddleware(secretKey []byte, jwtRepository *repository.JWTRepository, jwtService *JWTService) func(handler http.Handler) http.Handler {
+func JWTMiddleware(secretKey []byte, jwtRepository *repository.JWTRepository, jwtService *JWTService, adminToken string) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(handleAuthentication(secretKey, jwtRepository, jwtService, next))
+		return http.HandlerFunc(handleAuthentication(secretKey, jwtRepository, jwtService, adminToken, next))
 	}
 }
 
-func handleAuthentication(secretKey []byte, jwtRepository *repository.JWTRepository, jwtService *JWTService, next http.Handler) func(writer http.ResponseWriter, request *http.Request) {
+func handleAuthentication(secretKey []byte, jwtRepository *repository.JWTRepository, jwtService *JWTService, adminToken string, next http.Handler) func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		authorizationHeader := request.Header.Get("Authorization")
-		if strings.HasPrefix(authorizationHeader, "Bearer ") == false {
+		if !strings.HasPrefix(authorizationHeader, "Bearer ") {
 			http.Error(writer, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		jwtTokenStr := strings.TrimPrefix(authorizationHeader, "Bearer ")
+		token := strings.TrimPrefix(authorizationHeader, "Bearer ")
 
-		claims, err := jwtService.ValidateJWT(jwtTokenStr, secretKey)
+		if token == adminToken {
+			adminClaims := &Claims{
+				UserUUID: "admin",
+				IsAdmin:  true,
+			}
+			req := request.WithContext(context.WithValue(request.Context(), UserContextKey, adminClaims))
+			next.ServeHTTP(writer, req)
+			return
+		}
+
+		claims, err := jwtService.ValidateJWT(token, secretKey)
 		if err != nil {
 			log.Printf("невалидный токен: %v", err)
 			http.Error(writer, "невалидный токен", http.StatusUnauthorized)
@@ -140,13 +158,22 @@ func handleAuthentication(secretKey []byte, jwtRepository *repository.JWTReposit
 			http.Error(writer, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		if refreshToken.Used == true {
-			log.Printf("рефреш токен был использован: %v", err)
+
+		if refreshToken.Used {
+			log.Printf("рефреш токен был использован")
 			http.Error(writer, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		reuqest := request.WithContext(context.WithValue(request.Context(), "user", claims))
-		next.ServeHTTP(writer, reuqest)
+		req := request.WithContext(context.WithValue(request.Context(), UserContextKey, claims))
+		next.ServeHTTP(writer, req)
 	}
+}
+
+func GetClaimsFromContext(ctx context.Context) (*Claims, error) {
+	claims, ok := ctx.Value(UserContextKey).(*Claims)
+	if !ok || claims == nil {
+		return nil, fmt.Errorf("пользователь не авторизован")
+	}
+	return claims, nil
 }
