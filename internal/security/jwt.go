@@ -40,20 +40,20 @@ func NewJWTService(cfg *config.JWTConfig) *JWTService {
 	return &JWTService{cfg}
 }
 
-func (service *JWTService) GenerateAccessRefreshTokens(userUUID string) (*model.TokensPair, *model.RefreshToken, error) {
+func (s *JWTService) GenerateAccessRefreshTokens(userUUID string) (*model.TokensPair, *model.RefreshToken, error) {
 	refreshToken, refreshTokenStr, err := GenerateRefreshToken()
 	if err != nil {
 		return nil, nil, util.LogError("ошибка генерации рефреш токена", err)
 	}
 
 	refreshToken.UserUUID = userUUID
-	timeDuration, err := time.ParseDuration(service.RefreshTokenTTL)
+	timeDuration, err := time.ParseDuration(s.RefreshTokenTTL)
 	if err != nil {
 		return nil, nil, util.LogError("ошибка парсинга", err)
 	}
 	refreshToken.ExpireAt = time.Now().Add(timeDuration)
 
-	timeDuration, err = time.ParseDuration(service.AccessTokenTTL)
+	timeDuration, err = time.ParseDuration(s.AccessTokenTTL)
 	if err != nil {
 		return nil, nil, util.LogError("ошибка парсинга", err)
 	}
@@ -68,7 +68,7 @@ func (service *JWTService) GenerateAccessRefreshTokens(userUUID string) (*model.
 	}
 
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	accessToken, err := jwtToken.SignedString([]byte(service.SecretKey))
+	accessToken, err := jwtToken.SignedString([]byte(s.SecretKey))
 	if err != nil {
 		return nil, nil, util.LogError("ошибка подписи токена", err)
 	}
@@ -102,7 +102,7 @@ func GenerateRefreshToken() (*model.RefreshToken, string, error) {
 	}, refreshTokenStr, nil
 }
 
-func (service *JWTService) ValidateJWT(jwtTokenStr string, secretKey []byte) (*Claims, error) {
+func (s *JWTService) ValidateJWT(jwtTokenStr string, secretKey []byte) (*Claims, error) {
 	var claims = &Claims{}
 
 	jwtToken, err := jwt.ParseWithClaims(jwtTokenStr, claims, func(token *jwt.Token) (interface{}, error) {
@@ -175,5 +175,28 @@ func GetClaimsFromContext(ctx context.Context) (*Claims, error) {
 	if !ok || claims == nil {
 		return nil, fmt.Errorf("пользователь не авторизован")
 	}
+	return claims, nil
+}
+
+func (s *JWTService) ParseAccessToken(tokenStr string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("неизвестный метод подписи: %v", token.Header["alg"])
+		}
+		return []byte(s.SecretKey), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ошибка парсинга токена: %w", err)
+	}
+
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("токен недействителен")
+	}
+
+	if claims.ExpiresAt != nil && claims.ExpiresAt.Before(time.Now()) {
+		return nil, fmt.Errorf("срок действия токена истёк")
+	}
+
 	return claims, nil
 }
