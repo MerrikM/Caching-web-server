@@ -63,10 +63,10 @@ definitions:
   requestresponse.ErrorDetail:
     properties:
       code:
-        example: 400
+        example: 999
         type: integer
       text:
-        example: 'for example: invalid login or password'
+        example: some error text
         type: string
     type: object
   requestresponse.ErrorResponse:
@@ -122,6 +122,15 @@ definitions:
       password:
         example: P@ssw0rd123
         type: string
+    type: object
+  requestresponse.LoginResponse:
+    properties:
+      response:
+        properties:
+          token:
+            example: sfuqwejqjoiu93e29
+            type: string
+        type: object
     type: object
   requestresponse.LogoutItem:
     properties:
@@ -260,7 +269,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Получение токена по логину и паролю
+      description: Получение access токена по логину и паролю
       parameters:
       - description: Тело запроса
         in: body
@@ -272,27 +281,31 @@ paths:
       - application/json
       responses:
         "200":
-          description: Доступ успешно удалён
+          description: 'Успешная аутентификация" example({"response": {"token": "access_token_here"}})'
           schema:
-            $ref: '#/definitions/requestresponse.ResponseMessage'
+            $ref: '#/definitions/requestresponse.LoginResponse'
         "400":
-          description: Некорректный запрос
+          description: 'Некорректный JSON или пустые поля" example({"error": "login
+            и password обязательны"})'
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
         "401":
-          description: Пользователь не авторизован
+          description: 'Пользователь не авторизован" example({"error": "не удалось
+            авторизовать пользователя"})'
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
         "403":
-          description: Доступ запрещён
+          description: 'Доступ запрещён" example({"error": "Доступ запрещён"})'
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
         "404":
-          description: Документ не найден
+          description: 'пользователь не найден" example({"error": "пользователь не
+            найден"})'
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
         "500":
-          description: Внутренняя ошибка сервера
+          description: 'Внутренняя ошибка сервера" example({"error": "внутренняя ошибка
+            сервера"})'
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
       summary: Аутентификация пользователя
@@ -410,19 +423,22 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: 'Новые access и refresh токены" example({"response": {"access_token":
+            "new_access_token_here", "refresh_token": "new_refresh_token_here"}})'
           schema:
             $ref: '#/definitions/requestresponse.RefreshTokenResponse'
         "400":
-          description: Bad Request
+          description: 'Неверный JSON" example({"error": "неверный JSON"})'
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: 'Не авторизован или невалидный токен" example({"error": "не
+            удалось обновить токены"})'
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: 'Внутренняя ошибка сервера" example({"error": "внутренняя ошибка
+            сервера"})'
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
       summary: Обновление токенов
@@ -430,29 +446,37 @@ paths:
       - Authentication
   /api/docs:
     get:
-      description: Возвращает список документов с фильтрацией и пагинацией
+      description: Возвращает список документов с фильтрацией и пагинацией. Если параметр
+        `login` пустой — возвращаются свои документы.
       parameters:
-      - description: Login пользователя для просмотра чужих документов
+      - description: Логин пользователя, чьи документы хотите посмотреть. Если пусто
+          — свои документы.
+        example: '"john_doe"'
         in: query
         name: login
         type: string
-      - description: Имя колонки для фильтрации
+      - description: 'Ключ для фильтрации документов. Доступные значения: name, mime,
+          public, created.'
+        example: '"name"'
         in: query
         name: key
         type: string
-      - description: Значение фильтра
+      - description: Значение для фильтрации, соответствующее ключу.
+        example: '"report"'
         in: query
         name: value
         type: string
       - default: 20
-        description: Лимит документов на странице
+        description: Максимальное количество документов на странице. Минимум 1, максимум
+          100.
+        example: 20
         in: query
         maximum: 100
         minimum: 1
         name: limit
         type: integer
-      - default: Bearer <access_token>
-        description: Bearer токен
+      - description: Bearer токен пользователя.
+        example: '"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."'
         in: header
         name: Authorization
         required: true
@@ -461,74 +485,24 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Список документов
           schema:
             $ref: '#/definitions/requestresponse.ListDocumentsResponse'
         "400":
-          description: Bad Request
+          description: Неверные параметры запроса
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Пользователь не авторизован
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Внутренняя ошибка сервера
           schema:
             $ref: '#/definitions/requestresponse.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Список документов
-      tags:
-      - Documents
-    head:
-      description: Возвращает заголовки списка документов без тела (для HEAD запроса)
-      parameters:
-      - description: Login пользователя для просмотра чужих документов
-        in: query
-        name: login
-        type: string
-      - description: Имя колонки для фильтрации
-        in: query
-        name: key
-        type: string
-      - description: Значение фильтра
-        in: query
-        name: value
-        type: string
-      - default: 20
-        description: Лимит документов на странице
-        in: query
-        maximum: 100
-        minimum: 1
-        name: limit
-        type: integer
-      - default: Bearer <access_token>
-        description: Bearer токен
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Заголовки с информацией о документах
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/requestresponse.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/requestresponse.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/requestresponse.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Заголовки списка документов
       tags:
       - Documents
     post:

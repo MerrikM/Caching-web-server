@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/api/auth": {
             "post": {
-                "description": "Получение токена по логину и паролю",
+                "description": "Получение access токена по логину и паролю",
                 "consumes": [
                     "application/json"
                 ],
@@ -41,37 +41,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Доступ успешно удалён",
+                        "description": "Успешная аутентификация\" example({\"response\": {\"token\": \"access_token_here\"}})",
                         "schema": {
-                            "$ref": "#/definitions/requestresponse.ResponseMessage"
+                            "$ref": "#/definitions/requestresponse.LoginResponse"
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос",
+                        "description": "Некорректный JSON или пустые поля\" example({\"error\": \"login и password обязательны\"})",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Пользователь не авторизован",
+                        "description": "Пользователь не авторизован\" example({\"error\": \"не удалось авторизовать пользователя\"})",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Доступ запрещён",
+                        "description": "Доступ запрещён\" example({\"error\": \"Доступ запрещён\"})",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Документ не найден",
+                        "description": "пользователь не найден\" example({\"error\": \"пользователь не найден\"})",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Внутренняя ошибка сервера",
+                        "description": "Внутренняя ошибка сервера\" example({\"error\": \"внутренняя ошибка сервера\"})",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
@@ -195,25 +195,25 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Новые access и refresh токены\" example({\"response\": {\"access_token\": \"new_access_token_here\", \"refresh_token\": \"new_refresh_token_here\"}})",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.RefreshTokenResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Неверный JSON\" example({\"error\": \"неверный JSON\"})",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Не авторизован или невалидный токен\" example({\"error\": \"не удалось обновить токены\"})",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Внутренняя ошибка сервера\" example({\"error\": \"внутренняя ошибка сервера\"})",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
@@ -280,7 +280,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Возвращает список документов с фильтрацией и пагинацией",
+                "description": "Возвращает список документов с фильтрацией и пагинацией. Если параметр ` + "`" + `login` + "`" + ` пустой — возвращаются свои документы.",
                 "produces": [
                     "application/json"
                 ],
@@ -291,19 +291,22 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Login пользователя для просмотра чужих документов",
+                        "example": "\"john_doe\"",
+                        "description": "Логин пользователя, чьи документы хотите посмотреть. Если пусто — свои документы.",
                         "name": "login",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Имя колонки для фильтрации",
+                        "example": "\"name\"",
+                        "description": "Ключ для фильтрации документов. Доступные значения: name, mime, public, created.",
                         "name": "key",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Значение фильтра",
+                        "example": "\"report\"",
+                        "description": "Значение для фильтрации, соответствующее ключу.",
                         "name": "value",
                         "in": "query"
                     },
@@ -312,14 +315,15 @@ const docTemplate = `{
                         "minimum": 1,
                         "type": "integer",
                         "default": 20,
-                        "description": "Лимит документов на странице",
+                        "example": 20,
+                        "description": "Максимальное количество документов на странице. Минимум 1, максимум 100.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "default": "Bearer \u003caccess_token\u003e",
-                        "description": "Bearer токен",
+                        "example": "\"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"",
+                        "description": "Bearer токен пользователя.",
                         "name": "Authorization",
                         "in": "header",
                         "required": true
@@ -327,25 +331,25 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Список документов",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ListDocumentsResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Неверные параметры запроса",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Пользователь не авторизован",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
@@ -409,81 +413,6 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Внутренняя ошибка сервера",
-                        "schema": {
-                            "$ref": "#/definitions/requestresponse.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "head": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Возвращает заголовки списка документов без тела (для HEAD запроса)",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Documents"
-                ],
-                "summary": "Заголовки списка документов",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Login пользователя для просмотра чужих документов",
-                        "name": "login",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Имя колонки для фильтрации",
-                        "name": "key",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Значение фильтра",
-                        "name": "value",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 100,
-                        "minimum": 1,
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Лимит документов на странице",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "default": "Bearer \u003caccess_token\u003e",
-                        "description": "Bearer токен",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Заголовки с информацией о документах"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/requestresponse.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/requestresponse.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/requestresponse.ErrorResponse"
                         }
@@ -1716,11 +1645,11 @@ const docTemplate = `{
             "properties": {
                 "code": {
                     "type": "integer",
-                    "example": 400
+                    "example": 999
                 },
                 "text": {
                     "type": "string",
-                    "example": "for example: invalid login or password"
+                    "example": "some error text"
                 }
             }
         },
@@ -1804,6 +1733,20 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "example": "P@ssw0rd123"
+                }
+            }
+        },
+        "requestresponse.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "object",
+                    "properties": {
+                        "token": {
+                            "type": "string",
+                            "example": "sfuqwejqjoiu93e29"
+                        }
+                    }
                 }
             }
         },
@@ -2017,8 +1960,6 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "REST API Для работы с документами",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
-	LeftDelim:        "{{",
-	RightDelim:       "}}",
 }
 
 func init() {
