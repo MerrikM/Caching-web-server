@@ -25,8 +25,8 @@ func NewS3Service(ctx context.Context, cfg *config.S3Config) (*S3Service, error)
 		client = s3.New(s3.Options{
 			Region: cfg.Region,
 			Credentials: credentials.NewStaticCredentialsProvider(
-				"minioadmin",
-				"minioadmin",
+				cfg.Minio.Login,
+				cfg.Minio.Password,
 				"",
 			),
 			BaseEndpoint: aws.String(cfg.Endpoint),

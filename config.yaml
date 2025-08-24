@@ -14,6 +14,9 @@ s3Config:
   region: "us-east-1"
   endpoint: "http://minio:9000"
   local: true
+  MINIO:
+    minio_login: "minioadmin"
+    minio_password: "minioadmin"
 
 serverAddr: ":8080"
 

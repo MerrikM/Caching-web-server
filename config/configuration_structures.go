@@ -18,6 +18,7 @@ type S3Config struct {
 	Region   string `yaml:"region"`
 	Endpoint string `yaml:"endpoint"`
 	Local    bool   `yaml:"local"`
+	Minio    *MINIO `yaml:"MINIO"`
 }
 
 type JWTConfig struct {
@@ -37,4 +38,9 @@ type AdminConfig struct {
 
 type TTL struct {
 	S3AndRedis int `yaml:"s3_and_redis"`
+}
+
+type MINIO struct {
+	Login    string `yaml:"minio_login"`
+	Password string `yaml:"minio_password"`
 }
