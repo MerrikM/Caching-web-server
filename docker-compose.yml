@@ -13,6 +13,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d  # скрипт инициализации
 
   redis:
     image: redis:7
@@ -37,10 +38,32 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
       - "9000:9000"
-      - "9001:9001" # веб-интерфейс
+      - "9001:9001"
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
+
+  app:
+    build: .
+    container_name: astral_app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: appdb
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
 
 volumes:
   postgres_data:

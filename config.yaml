@@ -1,18 +1,18 @@
 databaseConfig:
-  dsn: "postgresql://user:password@localhost:5433/appdb?sslmode=disable"
+  dsn: "postgresql://user:password@postgres:5432/appdb?sslmode=disable"
 
 TTL:
   s3_and_redis: 900
 
 redisConfig:
-  address: "localhost:6379"
+  address: "redis:6379"
   password: ""
   database: 0
 
 s3Config:
   bucket: "my-s3-bucket"
   region: "us-east-1"
-  endpoint: "http://localhost:9000"
+  endpoint: "http://minio:9000"
   local: true
 
 serverAddr: ":8080"
