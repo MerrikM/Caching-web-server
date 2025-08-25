@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"strings"
 	"time"
 )
 
@@ -109,25 +110,33 @@ func (r *UserRepository) ListUsers(ctx context.Context, exec sqlx.ExtContext, cu
 	query := `
         SELECT uuid, login, password_hash, created_at
         FROM users
-        WHERE created_at > $1
+        WHERE 
+            ($1::timestamp IS NULL OR (created_at, uuid) > ($1::timestamp, $2::uuid))
         ORDER BY created_at ASC, uuid ASC
-        LIMIT $2
+        LIMIT $3
     `
 
 	var cursorTime time.Time
+	var cursorUUID string
 	var err error
 
-	if cursor == "" {
-		cursorTime = time.Time{}
-	} else {
-		cursorTime, err = time.Parse(time.RFC3339Nano, cursor)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid cursor format: %w", err)
+	if cursor != "" {
+		// курсор в формате "time|uuid"
+		parts := strings.SplitN(cursor, "|", 2)
+		if len(parts) != 2 {
+			return nil, "", fmt.Errorf("invalid cursor format")
 		}
+		cursorTime, err = time.Parse(time.RFC3339Nano, parts[0])
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid cursor time: %w", err)
+		}
+		cursorUUID = parts[1]
 	}
 
 	var users []*model.User
-	err = sqlx.SelectContext(ctx, exec, &users, query, cursorTime, limit+1) // +1 для проверки наличия следующей страницы
+	err = sqlx.SelectContext(ctx, exec, &users, query,
+		nullableTime(cursorTime), nullableString(cursorUUID), limit+1,
+	)
 	if err != nil {
 		return nil, "", util.LogError("[UserRepo] не удалось получить список пользователей", err)
 	}
@@ -135,8 +144,24 @@ func (r *UserRepository) ListUsers(ctx context.Context, exec sqlx.ExtContext, cu
 	var nextCursor string
 	if len(users) > limit {
 		users = users[:limit]
-		nextCursor = users[len(users)-1].CreatedAt.Format(time.RFC3339Nano)
+		last := users[len(users)-1]
+		nextCursor = fmt.Sprintf("%s|%s", last.CreatedAt.Format(time.RFC3339Nano), last.UUID)
 	}
 
 	return users, nextCursor, nil
+}
+
+// nullableTime : nullable helpers (чтобы в SQL было NULL, если курсора нет)
+func nullableTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
+
+func nullableString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

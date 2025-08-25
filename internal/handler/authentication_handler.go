@@ -68,6 +68,8 @@ func (h *AuthenticationHandler) Login(w http.ResponseWriter, r *http.Request) {
 			util.HandleError(w, "доступ запрещён", http.StatusForbidden)
 		case strings.Contains(err.Error(), "не найден"):
 			util.HandleError(w, "пользователь не найден", http.StatusNotFound)
+		case strings.Contains(err.Error(), "неверный логин или пароль"):
+			util.HandleError(w, "неверный логин или пароль", http.StatusUnauthorized)
 		default:
 			util.HandleError(w, "внутренняя ошибка сервера", http.StatusInternalServerError)
 		}

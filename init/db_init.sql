@@ -8,6 +8,9 @@ CREATE TABLE users (
 
 -- индекс для case-insensitive уникальности
 CREATE UNIQUE INDEX uq_users_login_lower ON users (lower(login));
+CREATE INDEX idx_users_created_at_uuid
+    ON users (created_at ASC, uuid ASC);
+
 
 -- documents
 CREATE TABLE documents (
