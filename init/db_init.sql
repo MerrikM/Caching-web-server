@@ -28,6 +28,8 @@ CREATE TABLE documents (
 CREATE INDEX idx_documents_owner_created ON documents(owner_uuid, created_at DESC, uuid);
 CREATE INDEX idx_documents_sha256 ON documents(sha256);
 CREATE INDEX idx_documents_access_token ON documents(access_token);
+CREATE INDEX idx_documents_owner_name_created
+    ON documents(owner_uuid, filename_original ASC, created_at ASC);
 
 -- sharing ACL
 CREATE TABLE document_grants (
