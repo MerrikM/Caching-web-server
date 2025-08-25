@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -121,6 +122,10 @@ func (h *DocumentHandler) CreateDocument(w http.ResponseWriter, r *http.Request)
 	putURL, err := h.DocumentService.CreateDocument(ctx, document)
 	if err != nil {
 		log.Println(err)
+		if errors.Is(err, context.DeadlineExceeded) {
+			util.HandleError(w, "превышено время ожидания загрузки файла", http.StatusGatewayTimeout)
+			return
+		}
 		switch {
 		case strings.Contains(err.Error(), "не удалось URL"),
 			strings.Contains(err.Error(), "не удалось сохранить документ"),
